@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% macro render_list(renders, empty) %}
+  {% if renders %}
+    <ul class="renders">
+      {% for render in renders %}
+        <li>
+          <a href="/handoff/{{ render.id }}">
+            <strong>{{ render.song_title }}</strong>
+            <span class="meta">{{ render.style }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="meta">{{ empty }}</p>
+  {% endif %}
+{% endmacro %}
+{% block content %}
+  <h1>Hand-offs</h1>
+  <h2>Ready to post</h2>
+  {{ render_list(ready, "Nothing ready right now.") }}
+  <h2>Saved, waiting for a post</h2>
+  {{ render_list(awaiting_post, "No saved videos waiting.") }}
+{% endblock %}
