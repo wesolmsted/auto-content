@@ -1,8 +1,11 @@
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
@@ -91,3 +94,49 @@ def _to_drive_file(item: dict[str, Any]) -> DriveFile:
         created_at=datetime.fromisoformat(created) if created else None,
         description=item.get("description"),
     )
+
+
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+TOKEN_FILE_NAME = "google_token.json"
+
+
+class GoogleAuthError(Exception):
+    """No usable Google credentials: the owner has to run `ace auth google`."""
+
+
+def token_path(secrets_dir: Path) -> Path:
+    return secrets_dir / TOKEN_FILE_NAME
+
+
+def run_oauth_flow(client_json: Path) -> Credentials:
+    """Installed-app consent in the browser; returns credentials with a refresh token."""
+    flow = InstalledAppFlow.from_client_secrets_file(str(client_json), DRIVE_SCOPES)
+    credentials: Credentials = flow.run_local_server(port=0)
+    return credentials
+
+
+def save_credentials(credentials: Credentials, path: Path) -> None:
+    """Write the credentials JSON (including the refresh token) readable by the owner only."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as file:
+        file.write(credentials.to_json())  # type: ignore[no-untyped-call]
+    path.chmod(0o600)
+
+
+def load_credentials(path: Path, request: Any = None) -> Credentials:
+    """Load saved credentials, refreshing (and re-saving) them if the access token expired.
+
+    `request` is the HTTP transport for the refresh; tests pass a fake.
+    """
+    if not path.exists():
+        raise GoogleAuthError(f"no Google token at {path}: run `ace auth google` first")
+    credentials: Credentials = Credentials.from_authorized_user_file(  # type: ignore[no-untyped-call]
+        str(path), DRIVE_SCOPES
+    )
+    if not credentials.valid:
+        if not credentials.refresh_token:
+            raise GoogleAuthError("Google token has no refresh token: run `ace auth google`")
+        credentials.refresh(request or Request())  # type: ignore[no-untyped-call]
+        save_credentials(credentials, path)
+    return credentials

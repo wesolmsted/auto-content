@@ -93,7 +93,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
 @pytest.mark.parametrize(
     "argv",
     [
-        ["auth", "google"],
         ["auth", "meta"],
         ["auth", "tiktok"],
         ["ingest", "footage"],
