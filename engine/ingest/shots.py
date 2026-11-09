@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from engine.config import IngestSettings
+from engine.db.enums import Orientation
 from engine.ingest.models import Shot
 from engine.storage.media_store import MediaStore
 from engine.vision.tagger import VisionTagger
@@ -22,3 +23,18 @@ def build_shots(
     fails, so the whole file is retried rather than stored half-tagged.
     """
     raise NotImplementedError
+
+
+def display_size(width: int, height: int, rotation: int) -> tuple[int, int]:
+    """The size as shown: phones store portrait video as landscape plus a 90° rotation."""
+    if rotation % 180 == 90:
+        return height, width
+    return width, height
+
+
+def orientation_for(width: int, height: int) -> Orientation:
+    if width > height:
+        return Orientation.LANDSCAPE
+    if width < height:
+        return Orientation.PORTRAIT
+    return Orientation.SQUARE
