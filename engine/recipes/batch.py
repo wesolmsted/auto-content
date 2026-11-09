@@ -35,7 +35,13 @@ class SnippetChoice:
 
 
 def plan_batch(
-    session: Session, settings: Settings, rng: random.Random, now: datetime, n: int
+    session: Session,
+    settings: Settings,
+    rng: random.Random,
+    now: datetime,
+    n: int,
+    *,
+    snippet_id: int | None = None,
 ) -> list[RenderPlan]:
     """Up to `n` render plans pairing a fixed recipe with an active snippet of its type.
 
@@ -46,8 +52,9 @@ def plan_batch(
     the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
     `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
     Captions are left empty: the render step fills them from the config templates.
+    With `snippet_id`, only that snippet is planned.
     """
-    snippets = _active_snippets(session)
+    snippets = _active_snippets(session, snippet_id)
     library = _tagged_shots(session)
     repeats = _recent_render_counts(session, now)
     tiktok_left = settings.cadence.tiktok_renders_per_day - _tiktok_renders_today(
@@ -112,13 +119,16 @@ def _first_fillable(
     return None
 
 
-def _active_snippets(session: Session) -> list[SnippetChoice]:
-    rows = session.execute(
+def _active_snippets(session: Session, snippet_id: int | None) -> list[SnippetChoice]:
+    query = (
         select(SnippetRow, SongRow)
         .join(SongRow, SnippetRow.song_id == SongRow.id)
         .where(SnippetRow.active, SongRow.bpm.is_not(None), SongRow.duration_s.is_not(None))
         .order_by(SnippetRow.id)
-    ).all()
+    )
+    if snippet_id is not None:
+        query = query.where(SnippetRow.id == snippet_id)
+    rows = session.execute(query).all()
     return [
         SnippetChoice(
             id=snippet.id,
