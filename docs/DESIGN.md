@@ -218,8 +218,7 @@ stateDiagram-v2
     state "footage_files" as F {
         [*] --> new
         new --> downloaded
-        downloaded --> split
-        split --> tagged
+        downloaded --> tagged: build_shots splits + tags in one step
         tagged --> done: moved to Processed in Drive
     }
 ```
@@ -301,6 +300,11 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
 - `ace snippets add <audio> --start --end --type` (song audio is a local file the owner provides; not in Drive for v1).
 - Song analysis with librosa: tempo, beat times, downbeats (librosa beats + bar estimation; swap to madmom if downbeats prove unreliable). Drop detection: largest positive jump in onset-strength/RMS envelope inside the snippet, snapped to the nearest downbeat. The owner can override `drop_s`.
 - Outputs a `BeatGrid` (pure data) for the snippet window, times relative to snippet start.
+- As built:
+  - The beat grid assumes a constant tempo. librosa's beats are refined by a line fit and extended over the whole song; songs with tempo changes would need madmom.
+  - Songs are cached by resolved file path.
+  - `snippets.drop_s` is stored as absolute song time, like `start_s`/`end_s`.
+  - The drop is auto-detected for every snippet type unless `--drop` is given: the largest RMS rise of at least 3 dB, snapped to a downbeat.
 
 ### 7.3 Recipes and assembly (Phase 1)
 - `Recipe` is a Pydantic model whose fields are the README's recipe variables, each an enum. The **recipe space** (allowed values per variable) lives in config.
