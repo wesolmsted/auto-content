@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import datetime
 
-from engine.log import JsonFormatter
+from engine.log import JsonFormatter, configure_logging
 
 
 def format_record(**extra: object) -> dict[str, object]:
@@ -40,3 +40,13 @@ def test_exceptions_include_the_traceback() -> None:
         )
     line = json.loads(JsonFormatter().format(record))
     assert "ValueError: boom" in line["exc"]
+
+
+def test_configure_logging_keeps_http_libraries_quiet_so_secret_urls_are_not_logged() -> None:
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.NOTSET)
+
+    configure_logging("debug")
+
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+    assert logging.getLogger("httpcore").getEffectiveLevel() == logging.WARNING
