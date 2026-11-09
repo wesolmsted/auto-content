@@ -19,3 +19,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 ## Memories
 
 - [Prototype first](prototype-first.md): build the simplest working version end to end; defer refinements until usage shows they're needed
+- [Task 01: skeleton](task-01-skeleton.md): map of shared files, contracts, stub signatures, fixture ground truth, checks and gotchas. Read before any slice work

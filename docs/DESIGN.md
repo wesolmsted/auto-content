@@ -103,6 +103,9 @@ auto-content/
 │   ├── config.py              # Settings (pydantic-settings): TOML + env
 │   ├── db/                    # SQLAlchemy models, session, repositories
 │   ├── storage/               # MediaStore (local now, bucket later)
+│   ├── ffmpeg.py              # shared ffmpeg/ffprobe subprocess wrapper
+│   ├── http.py                # shared HTTP client with retries/backoff
+│   ├── log.py                 # JSON logging setup
 │   ├── drive/                 # DriveClient: list / download / move
 │   ├── vision/                # VisionTagger interface + Claude implementation, prompts
 │   ├── ingest/                # footage poller, scene split, shot tagging
@@ -123,7 +126,9 @@ auto-content/
     └── fixtures/              # generated test clips + audio (see §11)
 ```
 
-Dependency direction: `cli` → feature modules (`ingest`, `recipes`, …) → shared infrastructure (`db`, `storage`, `drive`, `vision`, `notify`, `config`). Feature modules don't import each other's internals; they communicate through the DB and the models in `engine/db` and `engine/recipes/models.py`.
+Dependency direction: `cli` → feature modules (`ingest`, `recipes`, …) → shared infrastructure (`db`, `storage`, `drive`, `vision`, `notify`, `config`). Feature modules don't import each other's internals; they communicate through the DB and the per-module contract models (`engine/<module>/models.py`).
+
+Each module owns its CLI commands in `engine/<module>/cli.py`, which `engine/cli.py` mounts. `ace auth google` lives in `drive/cli.py`, `ace auth meta|tiktok` and `ace posts link` in `measure/cli.py`, and `ace report weekly` in `learn/cli.py`.
 
 ---
 
@@ -142,7 +147,7 @@ Refinements over the README's first pass:
 ```
 footage_files
   id PK, drive_file_id UNIQUE, md5, name, size_bytes, local_path,
-  status [new|downloaded|split|tagged|done|failed], error, attempts,
+  status [new|downloaded|split|tagged|done|duplicate|failed], error, attempts,
   created_at, updated_at
 
 shots
@@ -150,7 +155,7 @@ shots
   width, height, fps, orientation [portrait|landscape|square],
   category, subject, setting, lighting, mood,          -- from vision tags
   motion_score REAL, quality_score REAL,                -- 0..1
-  has_face BOOL, tags_json, thumbnail_path,
+  has_face BOOL, tags_json, thumbnail_path, proxy_path,
   use_count INT DEFAULT 0, last_used_at,
   created_at
 
@@ -173,14 +178,14 @@ renders
   status [rendering|ready|approved|rejected|superseded|failed],
   notified_at, downloaded_at, download_count,
   reject_reason NULL, reject_note NULL, reviewed_at,
-  error, attempts, created_at
+  ffmpeg_argv_json, error, attempts, created_at, updated_at
 
 posts
   id PK, render_id FK, platform [ig_trial|tiktok],
   status [awaiting_post|matched|not_posted],
   external_id NULL, permalink NULL, posted_at NULL,
   match_method [auto|manual] NULL, match_score REAL NULL,
-  created_at, UNIQUE(render_id, platform)
+  created_at, updated_at, UNIQUE(render_id, platform)
 
 metrics
   id PK, post_id FK, checkpoint [24h|72h|export], source [api|export], fetched_at,
@@ -200,10 +205,10 @@ variable_scores
 style_references
   id PK, drive_file_id UNIQUE, md5, name, note, source_link,
   status [new|downloaded|analyzed|failed], error, attempts,
-  style_card_json, recipe_id FK NULL, recreation_notes, created_at
+  style_card_json, recipe_id FK NULL, recreation_notes, created_at, updated_at
 ```
 
-Schema changes go through Alembic migrations, never hand edits to the DB.
+Schema changes go through Alembic migrations, never hand edits to the DB. The SQLite file is `data_dir/db/engine.sqlite3`. Enums are stored as plain strings, so adding a value needs no migration. Datetime columns accept only timezone-aware UTC values.
 
 ### State machines
 

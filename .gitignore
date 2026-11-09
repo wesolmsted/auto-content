@@ -3,6 +3,9 @@ data/
 .env
 config/local.toml
 
+# Sub-agent git worktrees
+.claude/worktrees/
+
 # Python
 .venv/
 __pycache__/
