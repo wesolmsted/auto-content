@@ -19,7 +19,8 @@ from engine.recipes.assembly import assemble
 from engine.recipes.models import Recipe, RenderPlan
 from engine.recipes.selection import select_shots
 from engine.recipes.slots import NotEnoughShotsError
-from engine.snippets.models import BeatGrid
+from engine.snippets.analysis import beat_grid_for_snippet
+from engine.snippets.models import BeatGrid, SongAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ def _active_snippets(session: Session) -> list[SnippetChoice]:
     rows = session.execute(
         select(SnippetRow, SongRow)
         .join(SongRow, SnippetRow.song_id == SongRow.id)
-        .where(SnippetRow.active, SongRow.bpm.is_not(None))
+        .where(SnippetRow.active, SongRow.bpm.is_not(None), SongRow.duration_s.is_not(None))
         .order_by(SnippetRow.id)
     ).all()
     return [
@@ -129,22 +130,17 @@ def _active_snippets(session: Session) -> list[SnippetChoice]:
 
 
 def _beat_grid(snippet: SnippetRow, song: SongRow) -> BeatGrid:
-    """The song's beats inside the snippet window, shifted to snippet time."""
-
-    def window(times: list[float]) -> tuple[float, ...]:
-        return tuple(
-            time - snippet.start_s for time in times if snippet.start_s <= time <= snippet.end_s
-        )
-
-    drop_s = snippet.drop_s
-    in_window = drop_s is not None and snippet.start_s <= drop_s <= snippet.end_s
-    return BeatGrid(
+    """A drop outside the snippet window plans as no drop."""
+    analysis = SongAnalysis(
+        duration_s=song.duration_s or 0.0,
         bpm=song.bpm or 0.0,
-        beats=window(song.beats_json),
-        downbeats=window(song.downbeats_json),
-        drop_s=drop_s - snippet.start_s if drop_s is not None and in_window else None,
-        duration_s=snippet.end_s - snippet.start_s,
+        beats=tuple(song.beats_json),
+        downbeats=tuple(song.downbeats_json),
     )
+    drop_s = snippet.drop_s
+    if drop_s is not None and not snippet.start_s <= drop_s <= snippet.end_s:
+        drop_s = None
+    return beat_grid_for_snippet(analysis, snippet.start_s, snippet.end_s, drop_s)
 
 
 def _tagged_shots(session: Session) -> list[Shot]:
