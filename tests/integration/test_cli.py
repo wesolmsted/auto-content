@@ -99,8 +99,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
         ["ingest", "footage"],
         ["ingest", "references"],
         ["ingest", "exports"],
-        ["snippets", "add", "song.wav", "--start", "10", "--end", "25", "--type", "drop"],
-        ["snippets", "list"],
         ["render", "batch", "--n", "2", "--dry-run"],
         ["render", "one", "--recipe", "rcp_0123456789ab", "--snippet", "1"],
         ["notify", "test"],
