@@ -1,0 +1,162 @@
+# Defaults for every setting (see engine/config.py). No secrets or personal ids here.
+# Override per machine in config/local.toml (gitignored) or with ACE_<SECTION>__<KEY> env vars.
+
+data_dir = "./data"
+log_level = "INFO"
+# database_url = "postgresql+psycopg://..."   # default: sqlite file under data_dir/db
+
+[drive]
+# Folder ids are personal: set them in config/local.toml or ACE_DRIVE__<KEY>.
+# footage_inbox_folder_id = ""
+# footage_processed_folder_id = ""
+# references_inbox_folder_id = ""
+# references_processed_folder_id = ""
+# exports_inbox_folder_id = ""
+# exports_processed_folder_id = ""
+keep_reference_originals = true
+download_chunk_mb = 10
+max_retries = 5
+backoff_base_s = 1.0
+
+[ingest]
+scene_threshold = 27.0
+min_shot_s = 0.8
+max_shot_s = 8.0
+frames_per_shot = 3
+proxy_max_dim = 1080
+max_attempts = 3
+
+[vision]
+model = "claude-sonnet-5-5"
+max_tokens = 1024
+timeout_s = 60.0
+max_retries = 3
+
+[vision.vocabulary]
+category = ["city_night", "nature", "studio_performance", "crowd", "other"]
+subject = ["person", "group", "crowd", "instrument", "vehicle", "landscape", "architecture", "object", "none"]
+setting = ["street", "rooftop", "studio", "stage", "club", "indoor", "nature", "beach", "car", "other"]
+lighting = ["daylight", "golden_hour", "night", "neon", "low_light", "studio", "mixed"]
+mood = ["energetic", "calm", "moody", "euphoric", "intimate", "gritty"]
+
+[snippets]
+sample_rate = 22050
+beats_per_bar = 4
+
+[recipes]
+shot_cooldown_days = 3
+quality_floor = 0.4
+max_repeats_per_week = 3
+
+[recipes.space]
+cut_rate = ["every_beat", "every_2_beats", "downbeats", "one_long_shot"]
+opening_shot = ["most_motion", "person_face", "scenic", "text_led"]
+footage_category = ["city_night", "nature", "studio_performance", "crowd", "mixed"]
+length_s = [7, 12, 20]
+on_screen_text = ["none", "hook_lyric", "pov_caption"]
+snippet_type = ["hook", "drop", "intro_build"]
+look = ["natural", "warm", "high_contrast", "bw"]
+effects = ["zoom_punch_on_downbeat", "speed_ramp", "flash", "shake"]
+
+# Phase 1 renders only these three recipes (DESIGN.md §7.3).
+[[recipes.fixed]]
+cut_rate = "every_2_beats"
+hard_cut_on_drop = true
+opening_shot = "most_motion"
+footage_category = "mixed"
+length_s = 12
+on_screen_text = "none"
+snippet_type = "drop"
+look = "natural"
+effects = []
+
+[[recipes.fixed]]
+cut_rate = "every_beat"
+hard_cut_on_drop = true
+opening_shot = "most_motion"
+footage_category = "mixed"
+length_s = 7
+on_screen_text = "none"
+snippet_type = "drop"
+look = "high_contrast"
+effects = ["zoom_punch_on_downbeat"]
+
+[[recipes.fixed]]
+cut_rate = "downbeats"
+hard_cut_on_drop = true
+opening_shot = "scenic"
+footage_category = "mixed"
+length_s = 20
+on_screen_text = "none"
+snippet_type = "hook"
+look = "warm"
+effects = []
+
+[render]
+width = 1080
+height = 1920
+fps = 30
+video_codec = "libx264"
+video_profile = "high"
+crf = 20
+preset = "medium"
+audio_codec = "aac"
+audio_bitrate = "192k"
+luts_dir = "config/luts"          # <look>.cube; `natural` needs no file
+font_file = "config/fonts/text.ttf"
+keep_days = 7
+max_attempts = 3
+
+[tools]
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"
+
+[captions.templates]
+ig_trial = "{song}"
+tiktok = "{song}"
+
+[cadence]
+renders_per_day = 4
+tiktok_every_render = false
+tiktok_renders_per_day = 1
+
+[handoff]
+host = "127.0.0.1"
+port = 8000
+expire_hours = 72
+
+[notify]
+backend = "ntfy"
+timezone = "UTC"                  # set to the owner's IANA zone in config/local.toml
+timeout_s = 10.0
+max_retries = 3
+
+[notify.quiet_hours]
+start = 22:00:00
+end = 08:00:00
+
+[match]
+duration_tolerance_s = 0.5
+min_score = 0.3
+window_hours = 72
+fetch_slack_hours = 1.0
+caption_weight = 0.7
+time_weight = 0.3
+
+[measure]
+checkpoint_hours = [24, 72]
+meta_graph_url = "https://graph.facebook.com/v23.0"
+tiktok_api_url = "https://open.tiktokapis.com/v2"
+token_expiry_warn_days = 7
+max_attempts = 3
+
+[http]
+timeout_s = 30.0
+max_retries = 4
+backoff_base_s = 1.0
+
+[learn]
+baseline_window = 30
+explore_rate = 0.2
+settled_min_posts = 8
+superseded_weight = 0.25
