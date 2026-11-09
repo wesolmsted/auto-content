@@ -1,6 +1,6 @@
-# After Wes Content Engine
+# Auto Content Engine
 
-A personal pipeline for the After Wes music project. You drop in raw footage, and it cuts that footage to song snippets and sends each finished video to your phone. You post the ones you like yourself, as Instagram Trial Reels and on TikTok. The system then finds those posts, reads back the results, and tells you which styles to double down on and what to shoot next.
+A general-purpose content pipeline for music short-form video. You drop in raw footage, and it cuts that footage to song snippets and sends each finished video to your phone. You post the ones you like yourself, as Instagram Trial Reels and on TikTok. The system then finds those posts, reads back the results, and tells you which styles to double down on and what to shoot next.
 
 **Design goal:** your effort goes into capturing good footage and tapping "post". The system handles the editing, experimenting and learning.
 
@@ -66,7 +66,7 @@ The learning step has two outputs: **better edits** for the next batch, and a **
 ## Components
 
 ### 1. Ingest (Google Drive folder → shot library)
-- **Source:** one Google Drive folder (e.g. `After Wes / Footage / Inbox`) that you upload to from your phone.
+- **Source:** one Google Drive folder (e.g. `Content Engine / Footage / Inbox`) that you upload to from your phone.
 - **Detect new files:** poll the folder on a schedule with the Drive API (`files.list` filtered by parent folder and `mimeType contains 'video/'`).
 - **Track state:** record each Drive `fileId` and its `md5Checksum`, so files are processed once and re-uploads are de-duplicated.
 - **After processing:** move the file to a `Processed` subfolder, so the inbox shows only what's still pending.
@@ -177,7 +177,7 @@ Doubling down:
 You save reels or TikToks you like and upload them to a dedicated Google Drive folder. The script picks up each new file and analyzes it. Downloading is entirely your call; the system never fetches anything from Instagram or TikTok.
 
 **Intake (Google Drive references folder)**
-- **Source:** a separate Drive folder, e.g. `After Wes / References / Inbox`.
+- **Source:** a separate Drive folder, e.g. `Content Engine / References / Inbox`.
 - **Detection and state:** the same mechanism as footage ingest.
 - **Optional context:** the system reads two optional fields if present:
   - **Note:** the Drive file's description field, or text in the filename after `--` (e.g. `zoom punches -- love the pacing.mp4`). It's used to steer the analysis.
