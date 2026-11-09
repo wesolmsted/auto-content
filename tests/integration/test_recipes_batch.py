@@ -241,25 +241,11 @@ def test_tiktok_every_render_targets_tiktok_on_all(
     assert [render_plan.targets for render_plan in plans] == [both] * 4
 
 
-def test_captions_use_the_template_per_target(
+def test_captions_are_left_for_the_render_step_to_fill(
     db_session: Session, settings: Settings, seeded: dict[str, int]
 ) -> None:
-    templates = {Platform.IG_TRIAL: "{song} · {snippet}", Platform.TIKTOK: "{song} #fyp"}
-    captioned = settings.model_copy(
-        update={"captions": settings.captions.model_copy(update={"templates": templates})}
-    )
-    first, second = plan(db_session, captioned, n=2)
-    first_label = snippet_label(db_session, first)
-    second_label = snippet_label(db_session, second)
-    assert first.captions == {
-        Platform.IG_TRIAL: f"{SONG_TITLE} · {first_label}",
-        Platform.TIKTOK: f"{SONG_TITLE} #fyp",
-    }
-    assert second.captions == {Platform.IG_TRIAL: f"{SONG_TITLE} · {second_label}"}
-
-
-def snippet_label(session: Session, render_plan: RenderPlan) -> str | None:
-    return session.get_one(SnippetRow, render_plan.snippet_id).label
+    plans = plan(db_session, with_cadence(settings, tiktok_renders_per_day=1), n=2)
+    assert [render_plan.captions for render_plan in plans] == [{}, {}]
 
 
 def test_recipes_at_their_weekly_limit_are_not_planned(
