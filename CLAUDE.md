@@ -44,6 +44,38 @@ The [`.claude/`](.claude/) directory holds knowledge for this project and is com
 
 Never put secrets, tokens or personal account IDs in either.
 
+## Parallel agent workflow
+
+Coding is done by a main agent that hands scoped tasks to sub-agents, which run in parallel.
+
+**Main agent**
+- Splits work into tasks whose files don't overlap, so branches merge without conflicts.
+- Merges finished branches into `main`, runs `make check`, and pushes.
+- Owns the shared files: `docs/DESIGN.md`, `README.md`, `CLAUDE.md` and `.claude/memory/MEMORY.md`.
+- When a task finishes, adds its memory file to the index and updates DESIGN.md if the agent reports a deviation.
+
+**Sub-agents**
+- Work on their own branch, `task/<slice-number>-<short-name>`, in their own git worktree.
+- Commit there with the test-first workflow, and push the branch to `origin`. Never commit to or merge into `main`.
+- Edit only the files the task assigns them. If the task seems to need a change to a shared file, say so in the final report instead of making it. Shared files include:
+  - `pyproject.toml`, `uv.lock`, `engine/config.py`, `config/default.toml`;
+  - `engine/db/` and `alembic/`;
+  - `engine/cli.py`;
+  - shared domain models;
+  - the docs and memory index listed above.
+- Before finishing, write one memory file, `.claude/memory/task-<slice-number>-<short-name>.md`, in the format in `.claude/memory/MEMORY.md`. It should say:
+  - what was built, and the public functions and classes others will call;
+  - deviations from DESIGN.md, and why;
+  - gotchas, and how to run or test the module.
+
+  Don't edit `MEMORY.md`.
+- End with a short report:
+  - branch name and commits;
+  - `make check` result;
+  - files touched;
+  - any shared-file changes needed;
+  - open questions.
+
 ## Working rules
 
 - Readable code: clear names, straightforward structure, match surrounding code. No comments for simple changes; comment only non-obvious *why*.
