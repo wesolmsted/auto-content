@@ -8,4 +8,4 @@ Default to getting a working prototype end to end before adding more features or
 
 **Why:** The owner rejected frame-fingerprint post matching as "over-engineering before we know if the other checks will work most of the time" (2026-11-08). They want evidence from real usage before adding complexity.
 
-**How to apply:** When designing or coding, ship the minimal version of each slice first, with a way to measure whether it's good enough (e.g. a match rate in `aw status`). Mention a refinement in one line as a possible follow-up; don't add it to the plan unless asked. Applies together with the test-first workflow in CLAUDE.md.
+**How to apply:** When designing or coding, ship the minimal version of each slice first, with a way to measure whether it's good enough (e.g. a match rate in `ace status`). Mention a refinement in one line as a possible follow-up; don't add it to the plan unless asked. Applies together with the test-first workflow in CLAUDE.md.

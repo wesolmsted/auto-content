@@ -25,7 +25,7 @@ New decisions get appended to the decision log in §13.
 ## 2. Design principles
 
 1. **The database is the source of truth for pipeline state.** Every unit of work (a footage file, a render, a post, a metric checkpoint) has a row with a `status`. Jobs query for rows in a given state, do the work, and advance the state. A crash mid-run loses nothing; the next run resumes.
-2. **Every job is idempotent and re-runnable.** Running `aw ingest` twice in a row does nothing the second time. Dedup keys are explicit (Drive `fileId` + `md5Checksum`, recipe param hash, etc.).
+2. **Every job is idempotent and re-runnable.** Running `ace ingest` twice in a row does nothing the second time. Dedup keys are explicit (Drive `fileId` + `md5Checksum`, recipe param hash, etc.).
 3. **Pure core, thin edges.** Decisions (shot selection, beat-grid cutting, post matching, bandit sampling, scoring) are pure functions over plain data and are unit-tested without I/O. External systems (Drive, vision API, FFmpeg, notifications, Meta, TikTok) sit behind small interfaces with fakes for tests.
 4. **Plan, then execute.** Rendering is split into building a `Timeline` (pure data: which shot, which in/out points, which effects, at which output times) and executing it with FFmpeg. The timeline is stored with the render, so any video can be explained and reproduced.
 5. **One failure doesn't block the batch.** Per-item errors are recorded on the row (`error`, `attempts`) and the job moves on. Items past `max_attempts` go to `failed` and show up in the report.
@@ -39,14 +39,14 @@ New decisions get appended to the decision log in §13.
 ```mermaid
 flowchart TB
     subgraph Scheduled CLI jobs
-        ING[aw ingest footage]
-        REF[aw ingest references]
-        GEN[aw render batch]
-        MEA[aw measure due]
-        LRN[aw learn update]
-        RPT[aw report weekly]
+        ING[ace ingest footage]
+        REF[ace ingest references]
+        GEN[ace render batch]
+        MEA[ace measure due]
+        LRN[ace learn update]
+        RPT[ace report weekly]
     end
-    WEB[aw serve<br/>hand-off web app]
+    WEB[ace serve<br/>hand-off web app]
 
     DB[(SQLite)]
     FS[(Local media store<br/>scratch / shots / renders)]
@@ -63,25 +63,25 @@ flowchart TB
     MEA -->|read-only| TT[TikTok Display API]
 ```
 
-Two long-lived processes at most: the scheduler (launchd locally, cron/cloud scheduler later) that invokes CLI jobs, and `aw serve` for the hand-off page. Everything else is a short-lived command.
+Two long-lived processes at most: the scheduler (launchd locally, cron/cloud scheduler later) that invokes CLI jobs, and `ace serve` for the hand-off page. Everything else is a short-lived command.
 
 ### Default schedule
 
 | Job | Cadence | Notes |
 | --- | --- | --- |
-| `aw ingest footage` | every 30 min | Poll, download, split, tag. |
-| `aw ingest references` | every 30 min | Phase 3. |
-| `aw ingest exports` | daily | Imports TikTok Studio export files from Drive (§7.6). |
-| `aw render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4) and sends one notification per finished render. |
-| `aw measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
-| `aw learn update` | daily, after measure | Recomputes variable scores. Phase 2. |
-| `aw report weekly` | Mondays 07:00 | Report + shoot list. Phase 2. |
+| `ace ingest footage` | every 30 min | Poll, download, split, tag. |
+| `ace ingest references` | every 30 min | Phase 3. |
+| `ace ingest exports` | daily | Imports TikTok Studio export files from Drive (§7.6). |
+| `ace render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4) and sends one notification per finished render. |
+| `ace measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
+| `ace learn update` | daily, after measure | Recomputes variable scores. Phase 2. |
+| `ace report weekly` | Mondays 07:00 | Report + shoot list. Phase 2. |
 
 ---
 
 ## 4. Repository layout
 
-The README's proposed layout, made concrete. The installable package is `engine`; the CLI entry point is `aw`.
+The README's proposed layout, made concrete. The installable package is `engine`; the CLI entry point is `ace`.
 
 ```
 auto-content/
@@ -90,7 +90,7 @@ auto-content/
 ├── docs/
 │   ├── DESIGN.md              # this document
 │   └── runbooks/              # setup: Google OAuth, Meta app (read-only), TikTok app (read-only), ntfy, Tailscale
-├── pyproject.toml             # deps, ruff, mypy, pytest config; `aw` console script
+├── pyproject.toml             # deps, ruff, mypy, pytest config; `ace` console script
 ├── uv.lock
 ├── Dockerfile                 # cloud-ready image (python + ffmpeg)
 ├── .env.example               # every env var, no values
@@ -293,7 +293,7 @@ Domain models (`DriveFile`, `ShotTags`, `Recipe`, `Timeline`, `Notification`, `P
 Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in `config/default.toml` and included in the prompt, so tags stay matchable against recipe filters.
 
 ### 7.2 Snippets (Phase 1)
-- `aw snippets add <audio> --start --end --type` (song audio is a local file the owner provides; not in Drive for v1).
+- `ace snippets add <audio> --start --end --type` (song audio is a local file the owner provides; not in Drive for v1).
 - Song analysis with librosa: tempo, beat times, downbeats (librosa beats + bar estimation; swap to madmom if downbeats prove unreliable). Drop detection: largest positive jump in onset-strength/RMS envelope inside the snippet, snapped to the nearest downbeat. The owner can override `drop_s`.
 - Outputs a `BeatGrid` (pure data) for the snippet window, times relative to snippet start.
 
@@ -317,7 +317,7 @@ Phase 1 ships **3 fixed recipes** from config. Phase 2 replaces fixed recipes wi
 
 **Notification.** A `Notification` per ready render through `Notifier` (ntfy: `POST https://ntfy.sh/<topic>` or a self-hosted server). Fields: title `"Hand-off ready: <song> · <recipe short name>"`, body with length and targets, `Click` header = the hand-off page URL (Tailscale hostname), tag for the platform icons. The topic name is a long random string kept in secrets (anyone who knows a public ntfy topic can read it). Quiet hours from config: notifications due inside them are held until the window ends.
 
-**Hand-off page** (`aw serve`, FastAPI on the Mac, reached over Tailscale). Auth: a long random token in a cookie set once via `/login?token=…`; Tailscale is the network boundary.
+**Hand-off page** (`ace serve`, FastAPI on the Mac, reached over Tailscale). Auth: a long random token in a cookie set once via `/login?token=…`; Tailscale is the network boundary.
 - `/` lists `ready` renders (newest first) and recent `approved` ones awaiting a post.
 - `/handoff/{render_id}` shows:
   - a video preview, served from `/handoff/{id}/preview` (HTTP Range support for scrubbing). **Previewing is not approval.**
@@ -337,9 +337,9 @@ Since the owner posts by hand, the system has to find each post on the platform 
 **Platform readers**
 - **Instagram** (Meta Graph API, Instagram Business/Creator account). `GET /{ig-user-id}/media` with fields `id, permalink, timestamp, caption, media_type, media_product_type`, and per-media insights (`views`, `reach`, `saved`, `shares`, `ig_reels_avg_watch_time`, `reels_skip_rate`). Read scopes only (insights + basic). Long-lived token refresh is a scheduled check; the job fails loudly a week before expiry. *To verify in setup:* trial reels appear in the media list with insights before graduation (see §14).
 - **TikTok** (Display API via the owner's own developer app, Login Kit, scopes `user.info.basic` + `video.list`). `POST /v2/video/list/` returns `id, create_time, video_description, duration, share_url` plus `view_count, like_count, comment_count, share_count`. No watch-time or retention data. Reading needs no posting audit. *To verify in setup:* the app can be approved, or used in sandbox, for the owner's own account (see §14). The Display API is used for matching and for the 24 h / 72 h count checkpoints.
-- **TikTok watch time: weekly TikTok Studio export.** Once a week the owner downloads the per-post analytics export from TikTok Studio (desktop) and drops it in a Drive folder (`Content Engine / TikTok Exports / Inbox`). `aw ingest exports` reuses the Drive poller (same `fileId` + `md5` dedup, moved to `Processed` after import), parses the file and joins each row to a matched TikTok post by video ID/link. If the export has no ID column, it falls back to post date + caption text against matched posts. Each joined row upserts that post's `export` metrics row (`avg_watch_s`, `full_watch_rate`, plus the counts). Rows that don't join are counted on `metric_imports.rows_unmatched` and listed in the weekly report. No scraping or browser automation of TikTok or Instagram.
+- **TikTok watch time: weekly TikTok Studio export.** Once a week the owner downloads the per-post analytics export from TikTok Studio (desktop) and drops it in a Drive folder (`Content Engine / TikTok Exports / Inbox`). `ace ingest exports` reuses the Drive poller (same `fileId` + `md5` dedup, moved to `Processed` after import), parses the file and joins each row to a matched TikTok post by video ID/link. If the export has no ID column, it falls back to post date + caption text against matched posts. Each joined row upserts that post's `export` metrics row (`avg_watch_s`, `full_watch_rate`, plus the counts). Rows that don't join are counted on `metric_imports.rows_unmatched` and listed in the weekly report. No scraping or browser automation of TikTok or Instagram.
 
-**Matching** (`aw measure due`, step 1): for each platform with `awaiting_post` rows:
+**Matching** (`ace measure due`, step 1): for each platform with `awaiting_post` rows:
 1. Fetch the platform's videos posted since the oldest `downloaded_at` among those rows (minus 1 h slack).
 2. Drop videos already linked to a post.
 3. `match_posts(awaiting, candidates) -> list[Match]` is a pure function. Scoring per (post, video) pair:
@@ -369,7 +369,7 @@ Since the owner posts by hand, the system has to find each post on the platform 
 - Graduation of trial reels to followers is done by the owner in the Instagram app. The weekly report recommends which trials to graduate.
 
 ### 7.8 Weekly report and shoot list (Phase 2)
-- Report rendered to HTML (served at `/report/<week>` by `aw serve`, with a notification when it's ready) plus a short summary.
+- Report rendered to HTML (served at `/report/<week>` by `ace serve`, with a notification when it's ready) plus a short summary.
 - Contents: winners, losers and confidence per variable; trials worth graduating; hand-off funnel (ready → downloaded → posted); unmatched posts to link.
 - Shoot list = winning footage traits (`category`, `setting`, `lighting`, high-motion vs static) × library gaps (count of high-quality shots matching each winning trait, vs what next week's planned recipes need). Generated text is templated from structured findings; an LLM may phrase it, but the numbers come from the DB.
 
@@ -395,7 +395,7 @@ Reuses the Drive poller with the references folder. Measurement (scene cuts, bea
 ### Cloud-readiness checklist
 Kept true from day one so a move is a deploy, not a refactor:
 - [ ] No absolute or Mac-specific paths; everything under `data_dir`.
-- [ ] `Dockerfile` builds and `aw --help` runs in it (CI check).
+- [ ] `Dockerfile` builds and `ace --help` runs in it (CI check).
 - [ ] `MediaStore` is the only code touching media file locations (in the cloud, the hand-off download becomes a signed bucket URL, and the approval is recorded before the redirect).
 - [ ] DB URL is config; no SQLite-only SQL in queries.
 - [ ] Jobs are single-shot commands, so any scheduler can run them.
@@ -420,20 +420,20 @@ Kept true from day one so a move is a deploy, not a refactor:
 ## 10. CLI surface
 
 ```
-aw init                        # create data dirs, run migrations, check ffmpeg
-aw auth google | meta | tiktok # one-time OAuth flows (meta/tiktok are read-only scopes)
-aw ingest footage | references | exports
-aw snippets add <audio> --start S --end S --type hook|drop|intro_build
-aw snippets list
-aw render batch [--n N] [--recipe ID] [--snippet ID] [--dry-run]   # dry-run prints timelines, no notifications
-aw render one --recipe ID --snippet ID                            # dev loop
-aw notify test                 # send a test notification to the phone
-aw serve [--host --port]       # hand-off page
-aw measure due                 # match posts, then pull due metrics
-aw posts link <render_id> <platform> <url>                        # manual match
-aw learn update
-aw report weekly
-aw status                      # counts per table/status, recent failures
+ace init                        # create data dirs, run migrations, check ffmpeg
+ace auth google | meta | tiktok # one-time OAuth flows (meta/tiktok are read-only scopes)
+ace ingest footage | references | exports
+ace snippets add <audio> --start S --end S --type hook|drop|intro_build
+ace snippets list
+ace render batch [--n N] [--recipe ID] [--snippet ID] [--dry-run]   # dry-run prints timelines, no notifications
+ace render one --recipe ID --snippet ID                            # dev loop
+ace notify test                 # send a test notification to the phone
+ace serve [--host --port]       # hand-off page
+ace measure due                 # match posts, then pull due metrics
+ace posts link <render_id> <platform> <url>                        # manual match
+ace learn update
+ace report weekly
+ace status                      # counts per table/status, recent failures
 ```
 
 ---
@@ -467,12 +467,12 @@ Each slice ends with something runnable and tested.
 4. **Snippets**: `snippets add`, beat grid, drop detection.
 5. **Assembly**: Recipe model, 3 fixed recipes, selection + `assemble` → Timeline (`render batch --dry-run`).
 6. **Render**: FFmpeg pipeline, LUTs, text, validation.
-7. **Notify**: `Notifier` + ntfy, quiet hours, retry of unsent notifications, `aw notify test`.
-8. **Hand-off page**: `aw serve`, preview, save/share, download = approval, reject, expiry, Tailscale runbook.
+7. **Notify**: `Notifier` + ntfy, quiet hours, retry of unsent notifications, `ace notify test`.
+8. **Hand-off page**: `ace serve`, preview, save/share, download = approval, reject, expiry, Tailscale runbook.
 9. **Platform readers**: Meta + TikTok read-only auth, `recent_videos`, `match_posts`, manual link.
 10. **Measure**: 24 h / 72 h metric pulls.
 
-Phase 2 starts with **TikTok export import** (`aw ingest exports`, `metric_imports`, join to posts), since it only matters once learning uses TikTok watch time.
+Phase 2 starts with **TikTok export import** (`ace ingest exports`, `metric_imports`, join to posts), since it only matters once learning uses TikTok watch time.
 
 Phases 2–4 follow the README roadmap; each gets broken into slices here before work starts. Build order follows the prototype-first rule: get each slice working end to end before adding refinements, and add a refinement only when real usage shows the simpler version falls short.
 
@@ -507,7 +507,7 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | Do trial reels appear in `GET /{ig-user-id}/media` with insights before graduation? | Verify in slice 9. If not, fall back to manual links + insights by media id, and recheck after graduation. |
 | Can the owner's own TikTok app read `video.list` for their account without full app review (sandbox)? | Verify in slice 9. If not, submit the app for read-only review; until then, match TikTok posts manually (Link post) and score them from the weekly export only. |
 | What exactly does the TikTok Studio export contain (per-post rows? video ID or link? avg watch time and full-watch %? file format)? | Get a sample export before building the importer; write the parser's tests against it, with personal data scrubbed. |
-| Is the match rate good enough without frame fingerprints? | Track the auto-match rate in `aw status` and the weekly report; revisit if manual links are frequent. |
+| Is the match rate good enough without frame fingerprints? | Track the auto-match rate in `ace status` and the weekly report; revisit if manual links are frequent. |
 | Captions and hashtags: templated or generated per post? | Templated per song from config. |
 | Rejection reasons: hard filter or prior? | Soft prior (§7.7). |
 | Where does song audio come from? | Local file passed to `snippets add`. |

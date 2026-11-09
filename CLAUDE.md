@@ -33,7 +33,7 @@ The project is not scaffolded yet (slice 1 in DESIGN.md §12). Once it is:
 - `uv sync`: install
 - `make check`: ruff lint + format check, mypy --strict, pytest (must pass before committing)
 - `uv run pytest tests/unit -x`: fast loop
-- `uv run aw --help`: CLI
+- `uv run ace --help`: CLI
 
 ## Project memory and skills
 
