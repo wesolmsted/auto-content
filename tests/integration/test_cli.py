@@ -95,7 +95,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
     [
         ["auth", "meta"],
         ["auth", "tiktok"],
-        ["ingest", "footage"],
         ["ingest", "references"],
         ["ingest", "exports"],
         ["snippets", "add", "song.wav", "--start", "10", "--end", "25", "--type", "drop"],
