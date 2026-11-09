@@ -48,7 +48,7 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
 - Inputs:
   - `settings.recipes.fixed`;
   - active snippets whose song has a `bpm`. The grid is the song's beats/downbeats inside `[start_s, end_s]` shifted to snippet time, and `drop_s - start_s` when the drop falls in the window;
-  - shots with `proxy_path`, all five tag columns, `motion_score` and `quality_score` set.
+  - shots with `proxy_path`, `category`, `motion_score` and `quality_score` set, converted by `engine/recipes/shot_rows.py: shot_from_row`. That's the lossless inverse of slice 2's `engine.ingest.job.shot_to_row`: tags come from `tags_json`, the full `ShotTags` dump. It's round-trip tested in `tests/integration/test_recipes_shot_rows.py`, and the main agent plans to consolidate the two into one shared place.
 - Each plan:
   - draws the shuffled (recipe, snippet with matching `snippet_type`) pairs whose recipe is under `max_repeats_per_week`. That counts non-failed renders with `created_at > now - 7 d`, plus this batch.
   - tries pairs until `select_shots` succeeds. A failing pair is logged and skipped. When no pair works, the batch stops early (and may be empty).
@@ -74,6 +74,6 @@ Mutation-checked: each property fails for its matching bug.
 ## Gotchas
 - `one_long_shot` with no in-video drop needs a single shot as long as the whole video. With `ingest.max_shot_s = 8`, it can't be filled for lengths of 12 or 20, so the pair is skipped. None of the fixed recipes use it.
 - A 4-render batch can need up to 56 distinct shots (the every_beat/7 s recipe uses 14 slots). A small library yields fewer plans, not an error.
-- `_beat_grid` in batch.py duplicates what slice 4's `beat_grid_for_snippet` will do. Feature modules shouldn't import each other's internals, and that function was a stub here. Unify them if they ever drift.
-- `ShotTags.quality` is filled from `quality_score`, and `issues` isn't read back from `tags_json`; selection uses neither.
-- Run: `uv run pytest tests/unit/test_recipes_*.py tests/integration/test_recipes_batch.py`.
+- `_beat_grid` in batch.py duplicates what slice 4's `beat_grid_for_snippet` will do. Feature modules shouldn't import each other's internals, and that function was still a stub when this was written. Unify them if they ever drift.
+- `_beat_grid` treats a drop outside the snippet window as no drop, while slice 4's `beat_grid_for_snippet` raises for one.
+- Run: `uv run pytest tests/unit/test_recipes_*.py tests/integration/test_recipes_*.py`.
