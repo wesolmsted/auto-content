@@ -73,6 +73,7 @@ Two long-lived processes at most: the scheduler (launchd locally, cron/cloud sch
 | `ace ingest references` | every 30 min | Phase 3. |
 | `ace ingest exports` | daily | Imports TikTok Studio export files from Drive (§7.6). |
 | `ace render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4). Their notifications are held until the 4–7 pm ET posting window (§7.5). |
+| `ace notify pending` | every 15 min, 16:00–19:00 ET | Sends the held hand-off notifications. Morning batch renders only notify on a run inside the window. |
 | `ace measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
 | `ace learn update` | daily, after measure | Recomputes variable scores. Phase 2. |
 | `ace report weekly` | Mondays 07:00 | Report + shoot list. Phase 2. |
@@ -452,7 +453,7 @@ ace render batch [--n N] [--recipe ID] [--snippet ID] [--dry-run]   # dry-run pr
 ace render one --recipe ID --snippet ID                            # dev loop
 ace notify test                 # send a test notification to the phone
 ace notify pending              # send hand-off notifications for ready renders (respects the posting window)
-ace serve [--host --port]       # hand-off page
+ace serve [--host --port]       # hand-off page (bind 127.0.0.1, expose with `tailscale serve --bg 8000` for HTTPS)
 ace measure due                 # match posts, then pull due metrics
 ace posts link <render_id> <platform> <url>                        # manual match
 ace learn update
