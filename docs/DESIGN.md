@@ -363,6 +363,11 @@ Since the owner posts by hand, the system has to find each post on the platform 
 - **TikTok** (Display API via the owner's own developer app, Login Kit, scopes `user.info.basic` + `video.list`). `POST /v2/video/list/` returns `id, create_time, video_description, duration, share_url` plus `view_count, like_count, comment_count, share_count`. No watch-time or retention data. Reading needs no posting audit. *To verify in setup:* the app can be approved, or used in sandbox, for the owner's own account (see §14). The Display API is used for matching and for the 24 h / 72 h count checkpoints.
 - **TikTok watch time: weekly TikTok Studio export.** Once a week the owner downloads the per-post analytics export from TikTok Studio (desktop) and drops it in a Drive folder (`Content Engine / TikTok Exports / Inbox`). `ace ingest exports` reuses the Drive poller (same `fileId` + `md5` dedup, moved to `Processed` after import), parses the file and joins each row to a matched TikTok post by video ID/link. If the export has no ID column, it falls back to post date + caption text against matched posts. Each joined row upserts that post's `export` metrics row (`avg_watch_s`, `full_watch_rate`, plus the counts). Rows that don't join are counted on `metric_imports.rows_unmatched` and listed in the weekly report. No scraping or browser automation of TikTok or Instagram.
 
+As built:
+- Instagram's media API returns no duration, so the duration filter is skipped for IG candidates.
+- `ace auth meta` swaps a short-lived Graph API Explorer token (read scopes) for a ~60-day token; the owner re-runs it when warned.
+- Manual links are resolved to the numeric IG media id and `posted_at` on the next `ace measure due`.
+
 **Matching** (`ace measure due`, step 1): for each platform with `awaiting_post` rows:
 1. Fetch the platform's videos posted since the oldest `downloaded_at` among those rows (minus 1 h slack).
 2. Drop videos already linked to a post.
