@@ -95,9 +95,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
     [
         ["ingest", "references"],
         ["ingest", "exports"],
-        ["render", "batch", "--n", "2", "--dry-run"],
-        ["render", "one", "--recipe", "rcp_0123456789ab", "--snippet", "1"],
-        ["serve", "--port", "8001"],
         ["learn", "update"],
         ["report", "weekly"],
     ],

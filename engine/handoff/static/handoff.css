@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light dark;
+  --accent: #2563eb;
+  --danger: #dc2626;
+  --muted: #6b7280;
+  --border: #d1d5db;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 { font-size: 1.4rem; margin: 0.5rem 0; }
+h2 { font-size: 1.05rem; margin: 1.25rem 0 0.5rem; }
+a { color: var(--accent); }
+
+.meta { color: var(--muted); font-size: 0.9rem; }
+.error { color: var(--danger); }
+
+video {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  border-radius: 0.5rem;
+}
+
+.button, button {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+
+.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.danger { border-color: var(--danger); color: var(--danger); }
+
+.card {
+  margin: 1rem 0;
+  padding: 0.25rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.caption { white-space: pre-wrap; user-select: all; }
+.reminder { font-weight: 600; }
+
+.renders { list-style: none; padding: 0; }
+.renders a {
+  display: block;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+.renders .meta { display: block; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+input[type="url"], textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font: inherit;
+}

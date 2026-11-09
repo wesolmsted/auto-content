@@ -26,3 +26,5 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 05: assembly](task-05-assembly.md): select_shots, assemble (cut/drop/length rules), plan_batch, shot_from_row, tested timeline invariants
 - [Task 06: render](task-06-render.md): render/validate/execute_plan, filter graph, effects, LUTs, TextRenderStyle, Anton font, drawtext needs ffmpeg-full locally
 - [Task 07: notify](task-07-notify.md): NtfyNotifier, quiet hours (4–7 pm ET window), pending hand-off notifications, FakeNotifier, owner's ntfy setup steps
+- [Task 08: hand-off page](task-08-handoff.md): routes, cookie auth, download = approval transaction, link-post URL parsing (IG shortcode/TikTok id), expiry, Tailscale serve runbook
+- [Task 11: render batch](task-11-render-batch.md): run_render_batch flow, ace render batch/one, shot_rows now in engine/ingest/shot_rows.py, beat-grid consolidation, e2e test

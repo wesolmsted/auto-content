@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ render.song_title }} · Hand-off{% endblock %}
+{% block content %}
+  <p><a href="/">&larr; All hand-offs</a></p>
+  <h1>{{ render.song_title }}</h1>
+  <p class="meta">
+    {{ render.style }}{% if render.duration_s %} · {{ "%.0f" | format(render.duration_s) }} s{% endif %}
+    · {{ render.status }}
+  </p>
+
+  <video src="/handoff/{{ render.id }}/preview" controls playsinline preload="metadata"></video>
+
+  {% if can_save %}
+    <a class="button primary" id="save-video" href="/handoff/{{ render.id }}/download"
+       download="{{ filename }}">Save video</a>
+  {% endif %}
+
+  {% for card in cards %}
+    <section class="card">
+      <h2>{{ card.label }}</h2>
+      <p class="reminder">{{ card.reminder }}</p>
+      <p class="caption" id="caption-{{ card.platform.value }}">{{ card.caption }}</p>
+      <button type="button" class="copy" data-caption="caption-{{ card.platform.value }}">Copy caption</button>
+
+      {% if card.permalink %}
+        <p class="meta">Linked: <a href="{{ card.permalink }}">{{ card.permalink }}</a></p>
+      {% elif card.linkable %}
+        <form method="post" action="/handoff/{{ render.id }}/link" class="link-post">
+          <input type="hidden" name="platform" value="{{ card.platform.value }}">
+          <label>Post URL
+            <input type="url" name="url" inputmode="url" required
+                   placeholder="Paste the link to the post">
+          </label>
+          {% if card.link_error %}<p class="error">{{ card.link_error }}</p>{% endif %}
+          <button type="submit">Link post</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endfor %}
+
+  {% if can_reject %}
+    <form method="post" action="/handoff/{{ render.id }}/reject" class="card">
+      <h2>Reject</h2>
+      <div class="chips">
+        {% for reason in reject_reasons %}
+          <label class="chip">
+            <input type="radio" name="reason" value="{{ reason.value }}" required>
+            {{ reason.value | replace("_", " ") }}
+          </label>
+        {% endfor %}
+      </div>
+      <textarea name="note" rows="2" placeholder="Optional note"></textarea>
+      <button type="submit" class="danger">Reject</button>
+    </form>
+  {% elif reject_reason %}
+    <p class="meta">Rejected: {{ reject_reason.value | replace("_", " ") }}{% if reject_note %} ({{ reject_note }}){% endif %}</p>
+  {% endif %}
+{% endblock %}

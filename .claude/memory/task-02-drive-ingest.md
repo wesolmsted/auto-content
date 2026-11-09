@@ -18,7 +18,7 @@ Slice 2 built the Drive side of `ace ingest footage` and the job that drives sli
 - `engine/ingest/job.py`:
   - `run_footage_ingest(session, drive, store, tagger, drive_settings, ingest_settings, build=build_shots) -> FootageIngestSummary(poll, built, shots, completed, failed)`;
   - `ShotBuilder` is the type alias of `build_shots`'s signature;
-  - `shot_to_row(Shot) -> ShotRow` is the domain→ORM conversion (tags go into columns plus `tags_json`). Slice 5 needs the reverse (`ShotRow` → `Shot`); none exists yet.
+  - the job stores shots with `shot_to_row`, which now lives in `engine/ingest/shot_rows.py` next to its inverse `shot_from_row` (moved there by task 11).
 - `engine/ingest/cli.py`: `make_drive_client(settings)` and `make_tagger(settings)` are the factories; tests monkeypatch them.
 
 ## How build_shots plugs in

@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from engine.db.enums import Orientation
 from engine.db.models import FootageFileRow, ShotRow
-from engine.ingest.job import shot_to_row
 from engine.ingest.models import QualityIssue, Shot, ShotTags
-from engine.recipes.shot_rows import shot_from_row
+from engine.ingest.shot_rows import shot_from_row, shot_to_row
 
 
 def make_shot(footage_file_id: int, **overrides: object) -> Shot:
