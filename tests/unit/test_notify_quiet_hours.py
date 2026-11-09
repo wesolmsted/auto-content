@@ -61,6 +61,39 @@ def test_window_within_one_day(now: datetime, expected: datetime) -> None:
     assert next_send_time(now.astimezone(UTC), DAYTIME) == expected.astimezone(UTC)
 
 
+POSTING_WINDOW_ONLY = notify_settings(time(19), time(16))
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        (new_york(2026, 6, 10, 6), new_york(2026, 6, 10, 16)),
+        (new_york(2026, 6, 10, 15, 59), new_york(2026, 6, 10, 16)),
+        (new_york(2026, 6, 10, 16), new_york(2026, 6, 10, 16)),
+        (new_york(2026, 6, 10, 17, 30), new_york(2026, 6, 10, 17, 30)),
+        (new_york(2026, 6, 10, 18, 59), new_york(2026, 6, 10, 18, 59)),
+        (new_york(2026, 6, 10, 19), new_york(2026, 6, 11, 16)),
+        (new_york(2026, 6, 10, 19, 30), new_york(2026, 6, 11, 16)),
+        # Spring forward on 2026-03-08 at 02:00 and fall back on 2026-11-01 at 02:00.
+        (new_york(2026, 3, 7, 19, 30), new_york(2026, 3, 8, 16)),
+        (new_york(2026, 3, 8, 6), new_york(2026, 3, 8, 16)),
+        (new_york(2026, 10, 31, 19, 30), new_york(2026, 11, 1, 16)),
+        (new_york(2026, 11, 1, 1, 30, fold=1), new_york(2026, 11, 1, 16)),
+    ],
+)
+def test_owner_posting_window_sends_only_from_4_to_7_pm_eastern(
+    now: datetime, expected: datetime
+) -> None:
+    assert next_send_time(now, POSTING_WINDOW_ONLY) == expected.astimezone(UTC)
+
+
+def test_posting_window_across_fall_back_holds_for_the_extra_hour() -> None:
+    held = next_send_time(new_york(2026, 10, 31, 19), POSTING_WINDOW_ONLY) - new_york(
+        2026, 10, 31, 19
+    ).astimezone(UTC)
+    assert held == timedelta(hours=22)
+
+
 def test_result_is_utc() -> None:
     sent = next_send_time(new_york(2026, 6, 10, 23), OVERNIGHT)
     assert sent.tzinfo == UTC

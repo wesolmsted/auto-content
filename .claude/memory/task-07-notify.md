@@ -45,6 +45,11 @@ Slice 7 built phone notifications for ready renders.
 ## Quiet hours
 - The window is `[start, end)` in local time in `notify.timezone`.
 - `start > end` wraps past midnight. `start == end`, or `quiet_hours` unset, means no window.
+- The owner posts only 4–7 pm Eastern. On main, the default is `America/New_York` with quiet hours from 19:00 to 16:00, so notifications go out only between 16:00 and 19:00 local time. Tests cover:
+  - 06:00 → held until 16:00 the same day;
+  - 17:30 → sent now;
+  - 19:30 → held until 16:00 the next day;
+  - both DST transitions (across fall back the hold is 22 h).
 - Inside the window, the job sends nothing and returns 0; it logs the time it will next send. Nothing is scheduled: the next run after the window ends sends the held renders.
 - `next_send_time` returns the window end. With DST:
   - when the end time repeats as clocks fall back, it uses the first occurrence after `now` (fold 0, then fold 1);

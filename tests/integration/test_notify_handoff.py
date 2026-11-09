@@ -152,6 +152,30 @@ def test_inside_quiet_hours_nothing_is_sent_and_renders_stay_pending(
     )
 
 
+@pytest.mark.parametrize(
+    ("now_utc", "expected_sent"),
+    [
+        (datetime(2026, 6, 10, 10, 0, tzinfo=UTC), 0),  # 06:00 EDT
+        (datetime(2026, 6, 10, 21, 30, tzinfo=UTC), 1),  # 17:30 EDT
+        (datetime(2026, 6, 10, 23, 30, tzinfo=UTC), 0),  # 19:30 EDT
+        (datetime(2026, 11, 2, 21, 30, tzinfo=UTC), 1),  # 16:30 EST, after fall back
+        (datetime(2026, 11, 2, 0, 30, tzinfo=UTC), 0),  # 19:30 EST
+    ],
+)
+def test_owner_posting_window_in_new_york(
+    db_session: Session, now_utc: datetime, expected_sent: int
+) -> None:
+    add_render(db_session)
+    settings = make_settings(QuietHours(start=time(19), end=time(16)))
+    settings = settings.model_copy(
+        update={"notify": settings.notify.model_copy(update={"timezone": "America/New_York"})}
+    )
+    notifier = FakeNotifier()
+    sent = send_pending_handoff_notifications(db_session, notifier, settings, now_utc)
+    assert sent == expected_sent
+    assert len(notifier.sent) == expected_sent
+
+
 def test_nothing_pending_sends_nothing(db_session: Session) -> None:
     notifier = FakeNotifier()
     assert send_pending_handoff_notifications(db_session, notifier, make_settings(), NOON_UTC) == 0
