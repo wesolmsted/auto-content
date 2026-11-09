@@ -309,7 +309,12 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
 ### 7.3 Recipes and assembly (Phase 1)
 - `Recipe` is a Pydantic model whose fields are the README's recipe variables, each an enum. The **recipe space** (allowed values per variable) lives in config.
 - `select_shots(recipe, library, beat_grid, rng) -> list[Shot]`: filter by category and quality floor, exclude shots used in the last `recipes.shot_cooldown_days`, rank by recipe's `opening_shot` criterion for slot 0.
-- `assemble(recipe, shots, beat_grid) -> Timeline`: compute cut points from `cut_rate`, force a cut on `drop_s` if `hard_cut_on_drop`, fit total length to `length_s` (snapped to the nearest beat), assign shots to slots (each slot ≥ shot duration or the shot is skipped), attach effects keyed to beat/downbeat times, attach text events.
+- `assemble(recipe, shots, beat_grid) -> Timeline`: compute cut points from `cut_rate`, force a cut on `drop_s` if `hard_cut_on_drop`, fit total length to `length_s` (snapped to the nearest beat), assign shots to slots (a shot must be at least as long as its slot, or it's skipped for that slot), attach effects keyed to beat/downbeat times, attach text events.
+- As built:
+  - No cut lands within 0.1 s of another cut or of the ends.
+  - Effects are keyed to downbeats, except `shake`, which is on every beat.
+  - Segments always start at the proxy's beginning.
+  - `plan_batch` writes nothing. The render integration inserts the `recipes` row and updates the shots' `use_count`/`last_used_at`.
 - Both functions are pure and deterministic given a seeded `rng`. These are the most heavily unit-tested functions in the codebase.
 - **Targets:** every render targets `ig_trial`. It also targets `tiktok` when its recipe is proven on IG (Phase 2) or when config forces it (`cadence.tiktok_every_render`, default false). In Phase 1, one render a day also targets TikTok.
 
