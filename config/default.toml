@@ -127,13 +127,14 @@ expire_hours = 72
 
 [notify]
 backend = "ntfy"
-timezone = "UTC"                  # set to the owner's IANA zone in config/local.toml
+timezone = "America/New_York"
 timeout_s = 10.0
 max_retries = 3
 
+# Prime-time posting window: hand-off notifications go out only 16:00–19:00 local time.
 [notify.quiet_hours]
-start = 22:00:00
-end = 08:00:00
+start = 19:00:00
+end = 16:00:00
 
 [match]
 duration_tolerance_s = 0.5

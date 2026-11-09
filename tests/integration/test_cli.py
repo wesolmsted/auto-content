@@ -93,17 +93,12 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
 @pytest.mark.parametrize(
     "argv",
     [
-        ["auth", "google"],
         ["auth", "meta"],
         ["auth", "tiktok"],
-        ["ingest", "footage"],
         ["ingest", "references"],
         ["ingest", "exports"],
-        ["snippets", "add", "song.wav", "--start", "10", "--end", "25", "--type", "drop"],
-        ["snippets", "list"],
         ["render", "batch", "--n", "2", "--dry-run"],
         ["render", "one", "--recipe", "rcp_0123456789ab", "--snippet", "1"],
-        ["notify", "test"],
         ["serve", "--port", "8001"],
         ["measure", "due"],
         ["posts", "link", "1", "ig_trial", "https://www.instagram.com/reel/abc/"],

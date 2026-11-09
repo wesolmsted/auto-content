@@ -81,5 +81,6 @@ Coding is done by a main agent that hands scoped tasks to sub-agents, which run 
 - Readable code: clear names, straightforward structure, match surrounding code. No comments for simple changes; comment only non-obvious *why*.
 - If it's unclear what's wanted, ask before proceeding.
 - **Commit and push after each well-scoped change** without waiting to be asked: one concern per commit, `make check` passing (once the project is scaffolded), pushed to `origin`. Don't bundle unrelated changes, and don't commit half-finished work.
+- **Temporary files go in `tmp/` at the repo (or worktree) root**, which is gitignored. Never use `/tmp` or other paths outside the repo; edits inside the repo don't need the owner's approval. Tests keep using pytest's `tmp_path`.
 - No secrets in code or git. Everything environment-specific goes through `engine/config.py` (DESIGN.md §8).
 - **The system never posts.** No code may call a platform's publish, upload or draft endpoint; platform APIs are read-only (metrics). The owner posts every video from the app after downloading it from the hand-off page (DESIGN.md §2.6, D8).

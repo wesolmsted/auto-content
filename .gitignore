@@ -6,6 +6,9 @@ config/local.toml
 # Sub-agent git worktrees
 .claude/worktrees/
 
+# Scratch files (use this instead of /tmp so edits stay inside the repo)
+tmp/
+
 # Python
 .venv/
 __pycache__/
