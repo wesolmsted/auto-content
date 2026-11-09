@@ -1,0 +1,72 @@
+---
+name: task-06-render
+description: Slice 6 render module: public functions, filter-graph layout, effect/look/text implementation, encode settings, execute_plan states, font/LUT sources, speed, gotchas
+type: project
+---
+
+Slice 6 built FFmpeg rendering (`engine/render/`). `ace render` CLI wiring and notifications are a later integration task.
+
+**Why:** later slices (render CLI, hand-off, text-style presets) build on these functions and quirks. **How to apply:** call the functions below; read the gotchas before touching the filter graph.
+
+## Public API
+- `engine/render/ffmpeg.py`
+  - `render(timeline, audio_path, audio_start_s, out_path, settings: RenderSettings, *, ffmpeg="ffmpeg") -> list[str]` returns the full argv run (via `engine.ffmpeg.run_ffmpeg`) and raises `FfmpegError`.
+  - `build_render_args(...)` is the pure argv builder, minus the binary.
+  - `validate(path, expected_duration_s, settings, *, ffprobe="ffprobe")` raises `RenderValidationError` when the duration is off by more than 1/fps, the size isn't width×height, or there's no audio stream. The message lists every problem.
+- `engine/render/filters.py` (pure):
+  - `build_filter_graph(timeline, settings, text_style=None) -> str`;
+  - `escape_filter_value(str)`;
+  - `lut_path_for(look, luts_dir)`, which returns None for `natural`;
+  - `TextRenderStyle(font_file, size_fraction=0.045, color="white", border_px=5, border_color="black")`, with `.default(settings)`;
+  - `VIDEO_OUTPUT_LABEL = "video"`.
+- `engine/render/job.py`
+  - `execute_plan(session, plan, store, settings: Settings) -> int` returns the render id. It takes the full `Settings` because it needs `render`, `tools` and `captions`.
+  - `captions_for(targets, templates, song_title, plan_captions)`: a non-empty `plan.captions[target]` wins; otherwise `templates[target].format(song=title)`.
+
+## Filter graph
+- Input i = segment i's `source_path`, one `-i` per segment even when files repeat. The audio is the last input, as `-ss audio_start_s -t duration -i audio`.
+- Per segment: `[i:v]trim=start:end, setpts=(PTS-STARTPTS)/speed, scale=W:H:force_original_aspect_ratio=increase, crop=W:H, setsar=1, fps=30, format=yuv420p [segmentI]`. The crop has no x/y, so ffmpeg centers it.
+- Then `concat=n=N:v=1:a=0` → effects → `lut3d` → `drawtext`… → `format=yuv420p[video]`.
+- Effects run after concat in output time, so `t` is the timeline's output time.
+  - **speed_ramp**: `setpts='if(between(T,a,b), a+d*sqrt((T-a)/d), T)/TB'` and then `fps`. It plays slow then fast inside the window and keeps the duration (a time-warp; it doesn't change which source frames are used).
+  - **zoom_punch_on_downbeat**: a single `zoompan` (d=1, s=W×H, fps) with `z = 1 + 0.15*Σ between(it,a,b)*(1-(it-a)/d)`. It jumps to 1.15× and eases back out.
+  - **shake**: `crop=w=iw-2m:h=ih-2m` with sin/cos x/y jitter gated by `between(t,…)`, then `scale=W:H`. m = 2% of the width. This crops every frame slightly (about 4% zoom) whenever shake is present.
+  - **flash**: one `eq=brightness='0.6*(1-(t-a)/d)':eval=frame:enable='between(t,a,b)'` per event.
+- Looks: `lut3d=file=<luts_dir>/<look>.cube`. `natural` adds no LUT.
+- Text: one `drawtext` per `TextEvent`.
+  - Options: `expansion=none` (so `%` is literal), x centered.
+  - y: top `h*0.12`, center `(h-text_h)/2`, lower_third `h*0.70-text_h/2`.
+  - Case is applied in Python. `enable='between(t,start,end)'`.
+  - No line wrapping: long text runs off the frame edges. Left for the text-style follow-up (TikTok Sans, presets, safe zones), which should extend `TextRenderStyle`.
+
+## Encode
+`-c:v libx264 -profile:v high -crf 20 -preset medium -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -t <duration>`, all from `RenderSettings`. With `-preset ultrafast` (used in tests), x264 reports Constrained Baseline even with `-profile:v high`. That's harmless.
+
+## execute_plan states
+1. Reads `SnippetRow`/`SongRow` (`session.get_one`: raises if missing).
+2. Inserts a `renders` row in `rendering` with `timeline_json`, `shot_ids_json`, `targets_json` and `captions_json`, and commits before rendering.
+3. Output path: `store.path_for(RENDERS, f"render_{id}.mp4")`.
+4. Retries **inside the call** up to `render.max_attempts`. Each try sets `attempts` and, on failure, `error` (plus `ffmpeg_argv_json` from `FfmpegError.argv`), then commits.
+5. On success: `file_path`, `duration_s` (the planned duration), `ffmpeg_argv_json`, `error=None`, status `ready`.
+6. After the last failure: `failed`. Exceptions never propagate, so the row always ends in `ready` or `failed`.
+
+## Assets
+- Font: `engine/render/fonts/Anton-Regular.ttf` (Anton, © The Anton Project Authors), SIL OFL 1.1, license in `engine/render/fonts/OFL.txt`. Source: github.com/google/fonts `ofl/anton`.
+  - The `render.font_file` default in `config/default.toml` (`config/fonts/text.ttf`) doesn't exist yet. Tests override it; the main agent should point it at the bundled font.
+- LUTs: `config/luts/{warm,high_contrast,bw}.cube`, 17³, generated by our own math (no third-party license).
+  - warm: R×1.06+0.03, G×1.01+0.01, B×0.88.
+  - high_contrast: 0.5+(x-0.5)×1.35, clamped.
+  - bw: Rec.709 luma.
+
+## Speed
+On an M3 Pro, a 12 s 1080×1920 render (6 segments, warm LUT, preset medium) took about 4.5 s, or about 5 s with every effect. The test renders (2 s, ultrafast) take under 1 s each.
+
+## Gotchas
+- **The local Homebrew ffmpeg 8.1.2 has no `drawtext`** (it's built without libfreetype). Rendering a timeline with texts fails there with FfmpegError. CI/Docker's Debian ffmpeg has it.
+  - `tests/integration/test_render_ffmpeg.py::test_text_is_burned_in_during_its_window` skips when the filter is missing.
+  - For text locally, `brew install ffmpeg-full` (keg-only) and pass its path via `tools.ffmpeg`.
+  - Escaping was checked by hand with an ffmpeg 4.3 build that has drawtext, using the text `POV: it's 3am, 100% [ok]; \ yes`.
+- Escaping is two-level. The graph parser strips one level of quoting, then the option parser treats `\ ' :` as special. `escape_filter_value` backslash-escapes `\ ' :` and then single-quotes the result, with `'` written as `'\''`. Use it for every free-form value (paths, text, colors). An integration test renders with a LUT dir named `it's, a: [weird] dir`.
+- `crop`'s w/h are evaluated only once (x/y are evaluated per frame), so a dynamic zoom has to use `zoompan`. zoompan's fps defaults to 25, so always pass `fps`.
+- `luts_dir`/`font_file` are relative to the current directory when relative (default `config/luts`), so run from the repo root or configure absolute paths.
+- Tests: `uv run pytest tests/unit/test_render_*.py tests/integration/test_render_*.py`.
