@@ -103,7 +103,7 @@ preset = "medium"
 audio_codec = "aac"
 audio_bitrate = "192k"
 luts_dir = "config/luts"          # <look>.cube; `natural` needs no file
-font_file = "config/fonts/text.ttf"
+font_file = "engine/render/fonts/Anton-Regular.ttf"
 keep_days = 7
 max_attempts = 3
 
