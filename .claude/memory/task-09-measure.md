@@ -9,7 +9,7 @@ Slices 9–10 built read-only platform readers, post matching, metric checkpoint
 **Why:** learning (Phase 2) and the hand-off page depend on how posts get matched and which metric fields exist; much of the API behaviour is still unverified. **How to apply:** call the functions below; check the "Unverified" list before trusting a metric; use `FakePlatformReader` in tests.
 
 ## Public API
-- `matching.py` (pure): `match_posts(awaiting, candidates, settings: MatchSettings) -> list[Match]`, `caption_similarity(provided, posted)`, `parse_post_url(platform, url) -> PostLink(external_id, permalink)`.
+- `matching.py` (pure): `match_posts(awaiting, candidates, settings: MatchSettings) -> list[Match]`, `caption_similarity(provided, posted)`. Post links are parsed with the hand-off page's `engine.handoff.links.parse_post_url`, shared by `ace posts link` and manual-link resolution.
 - `meta.py`: `MetaReader(client, graph_url, ig_user_id, access_token, http: HttpSettings, *, sleep, clock)`.
 - `tiktok.py`: `TikTokReader(client, api_url, access_token, http, *, sleep, clock)`.
 - `api.py`: `request_json(...)` (shared retries via `engine.http`) and `PlatformReadError`, whose message never holds the URL or token.
@@ -55,10 +55,10 @@ Slices 9–10 built read-only platform readers, post matching, metric checkpoint
 - Renders whose `duration_s` is NULL are skipped from matching.
 
 ## Manual links (`link_post`, `ace posts link`), same contract as the hand-off page
-- `parse_post_url`: IG `/reel/<code>/`, `/reels/<code>`, `/p/<code>/` → `external_id=<code>`, `permalink=https://www.instagram.com/reel/<code>/`. TikTok `/@<user>/video/<id>` → `external_id=<id>`, `permalink=https://www.tiktok.com/@<user>/video/<id>`. Short links (`vm.tiktok.com`) are rejected.
+- Uses `engine.handoff.links.parse_post_url`: IG → `external_id=<shortcode>`, `permalink=https://www.instagram.com/reel/<code>/`; TikTok → numeric id. Short links (`vm.tiktok.com`) and schemeless URLs are rejected with a `PostUrlError` (a ValueError).
 - Sets `matched`, `manual`, `match_score=None`, `posted_at=None`; also re-links an auto-matched post. It refuses if another post on that platform has the same `external_id` or `permalink`, and if the render has no post row for that platform ("download it from the hand-off page first").
 - The next `measure due` resolves the IG media id and posting time. TikTok posts without a TikTok token keep `posted_at` NULL, so they get no API checkpoints.
-- `engine.handoff.links.parse_post_url` duplicates this parser; the main agent plans to dedupe them.
+- `engine.measure.job` imports `engine.handoff.links` (deliberate, to share one parser).
 
 ## Fake (`tests/fakes/measure.py`)
 `FakePlatformReader(platform, videos=(), metrics=None)`:

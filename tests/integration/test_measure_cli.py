@@ -223,7 +223,7 @@ def test_posts_link_with_a_bad_link_exits_1(cli_env: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "error: not a ig_trial post link" in result.output
+    assert "error: not a reel link" in result.output
     assert read_post(post_id).status == PostStatus.AWAITING_POST
 
 

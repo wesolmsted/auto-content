@@ -2,15 +2,10 @@
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import timedelta
 
 from engine.config import MatchSettings
-from engine.db.enums import Platform
 from engine.measure.models import AwaitingPost, Match, PlatformVideo
-
-INSTAGRAM_LINK = re.compile(r"instagram\.com/(?:reel|reels|p)/([A-Za-z0-9_-]+)")
-TIKTOK_LINK = re.compile(r"tiktok\.com/@([^/?#]+)/video/(\d+)")
 
 
 def caption_tokens(text: str) -> set[str]:
@@ -83,26 +78,3 @@ def match_posts(
             )
         )
     return matches
-
-
-@dataclass(frozen=True)
-class PostLink:
-    """What a pasted post link identifies: the reel shortcode (Instagram) or video id (TikTok),
-    plus a canonical link."""
-
-    external_id: str
-    permalink: str
-
-
-def parse_post_url(platform: Platform, url: str) -> PostLink:
-    """Read a pasted post link: Instagram `/reel/<code>/` (or `/reels/`, `/p/`) and TikTok
-    `/@<user>/video/<id>`. Short links (vm.tiktok.com) aren't followed, so they're rejected."""
-    if platform == Platform.IG_TRIAL and (found := INSTAGRAM_LINK.search(url)):
-        code = found.group(1)
-        return PostLink(external_id=code, permalink=f"https://www.instagram.com/reel/{code}/")
-    if platform == Platform.TIKTOK and (found := TIKTOK_LINK.search(url)):
-        user, video_id = found.groups()
-        return PostLink(
-            external_id=video_id, permalink=f"https://www.tiktok.com/@{user}/video/{video_id}"
-        )
-    raise ValueError(f"not a {platform} post link: {url}")

@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from engine.config import Settings
 from engine.db.enums import MatchMethod, MetricCheckpoint, MetricSource, Platform, PostStatus
 from engine.db.models import MetricRow, PostRow, RenderRow
-from engine.measure.matching import match_posts, parse_post_url
+from engine.handoff.links import parse_post_url
+from engine.measure.matching import match_posts
 from engine.measure.models import AwaitingPost, MetricSnapshot, PlatformVideo
 from engine.measure.readers import PlatformReader
 

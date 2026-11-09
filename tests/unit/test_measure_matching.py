@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 
 from engine.config import load_settings
 from engine.db.enums import Platform
-from engine.measure.matching import PostLink, caption_similarity, match_posts, parse_post_url
+from engine.measure.matching import caption_similarity, match_posts
 from engine.measure.models import AwaitingPost, Match, PlatformVideo
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -150,62 +150,6 @@ def test_the_best_pair_wins_and_the_loser_takes_what_is_left() -> None:
 def test_empty_inputs_give_no_matches() -> None:
     assert match_posts([], [video()], MATCH_SETTINGS) == []
     assert match_posts([awaiting()], [], MATCH_SETTINGS) == []
-
-
-@pytest.mark.parametrize(
-    ("platform", "url", "external_id", "permalink"),
-    [
-        (
-            Platform.IG_TRIAL,
-            "https://www.instagram.com/reel/DAbc-12_x/?igsh=xyz",
-            "DAbc-12_x",
-            "https://www.instagram.com/reel/DAbc-12_x/",
-        ),
-        (
-            Platform.IG_TRIAL,
-            "https://instagram.com/reels/C9zzTop",
-            "C9zzTop",
-            "https://www.instagram.com/reel/C9zzTop/",
-        ),
-        (
-            Platform.IG_TRIAL,
-            "https://www.instagram.com/p/C9zzTop/",
-            "C9zzTop",
-            "https://www.instagram.com/reel/C9zzTop/",
-        ),
-        (
-            Platform.TIKTOK,
-            "https://www.tiktok.com/@some.user/video/7300000000000000001?is_from_webapp=1",
-            "7300000000000000001",
-            "https://www.tiktok.com/@some.user/video/7300000000000000001",
-        ),
-        (
-            Platform.TIKTOK,
-            "tiktok.com/@u/video/7300000000000000002",
-            "7300000000000000002",
-            "https://www.tiktok.com/@u/video/7300000000000000002",
-        ),
-    ],
-)
-def test_parse_post_url_gives_the_reel_code_or_video_id_and_a_canonical_link(
-    platform: Platform, url: str, external_id: str, permalink: str
-) -> None:
-    assert parse_post_url(platform, url) == PostLink(external_id=external_id, permalink=permalink)
-
-
-@pytest.mark.parametrize(
-    ("platform", "url"),
-    [
-        (Platform.IG_TRIAL, "https://www.tiktok.com/@u/video/7300000000000000001"),
-        (Platform.IG_TRIAL, "https://www.instagram.com/some.user/"),
-        (Platform.TIKTOK, "https://www.instagram.com/reel/DAbc/"),
-        (Platform.TIKTOK, "https://vm.tiktok.com/ZMabc123/"),
-        (Platform.TIKTOK, "not a url"),
-    ],
-)
-def test_parse_post_url_rejects_links_it_cannot_read(platform: Platform, url: str) -> None:
-    with pytest.raises(ValueError, match="link"):
-        parse_post_url(platform, url)
 
 
 captions = st.lists(st.sampled_from(WORDS), max_size=4).map(" ".join)
