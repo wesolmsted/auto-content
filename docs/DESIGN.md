@@ -291,7 +291,7 @@ Domain models (`DriveFile`, `ShotTags`, `Recipe`, `Timeline`, `Notification`, `P
 3. Normalize: probe with `ffprobe`; record rotation, fps, resolution.
 4. Split with PySceneDetect (`ContentDetector`, threshold in config). Drop shots shorter than `ingest.min_shot_s` (default 0.8 s). Split shots longer than `ingest.max_shot_s` (default 8 s) into sub-shots so selection has granularity.
 5. Per shot: extract 3 frames, compute `motion_score` (OpenCV optical flow magnitude, normalized) and a blur/shake heuristic locally, then call `VisionTagger.tag_shot` for semantic tags + quality. Final `quality_score` combines both.
-6. Encode a 9:16-ready **proxy** for each shot (H.264, 1080 px wide-side cap) into `data/media/shots/`. Renders read proxies, not originals, so renders don't depend on Drive.
+6. Encode a **proxy** for each shot (H.264, already center-cropped to 9:16, width capped at 1080 px) into `data/media/shots/`. Renders only scale the proxy to the output size; the cover-crop in render is then a no-op. Renders read proxies, not originals, so renders don't depend on Drive.
 7. Move the Drive file to `Processed`; status `done`.
 
 Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in `config/default.toml` and included in the prompt, so tags stay matchable against recipe filters.
@@ -318,6 +318,11 @@ Phase 1 ships **3 fixed recipes** from config. Phase 2 replaces fixed recipes wi
 ### 7.4 Render (Phase 1)
 - `render(timeline, snippet_audio, out_path)` builds a single FFmpeg filter graph: per-segment `trim` → reframe to 1080×1920 (center crop; face-aware crop is a later improvement) → effects → `concat` → LUT (`lut3d`) → text (`drawtext` with bundled fonts; see "Native-looking text" below) → mux snippet audio → H.264 High / AAC, 30 fps, `+faststart`.
 - The exact FFmpeg argv is logged and stored alongside the render for reproducibility.
+- As built:
+  - Effects are applied after concat, keyed to output time.
+  - `execute_plan` retries inside one call, up to `render.max_attempts`, so a render row always ends in `ready` or `failed`.
+  - The bundled default font is Anton (SIL OFL 1.1). The native-text task adds TikTok Sans.
+  - Text needs an ffmpeg build with `drawtext` (libfreetype). The Homebrew `ffmpeg` formula doesn't include it; `ffmpeg-full` does, and the Docker/Debian image does.
 - Output validated with `ffprobe` (duration within ±1 frame of plan, 9:16, has audio).
 - Captions per target, templated from config for v1 (open question in §14).
 - **Native-looking text** (follow-up task after slice 6): burned-in text should look like text added in the app.

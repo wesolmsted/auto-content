@@ -21,5 +21,7 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Prototype first](prototype-first.md): build the simplest working version end to end; defer refinements until usage shows they're needed
 - [Task 01: skeleton](task-01-skeleton.md): map of shared files, contracts, stub signatures, fixture ground truth, checks and gotchas. Read before any slice work
 - [Task 02: Drive ingest](task-02-drive-ingest.md): GoogleDriveClient, ace auth google, poll_footage, run_footage_ingest (pluggable build_shots), FakeDriveClient, status flow, OAuth setup
+- [Task 03: shot library](task-03-shot-library.md): build_shots (scene split, motion/quality, 9:16 proxies), ClaudeVisionTagger + prompt contract, FakeVisionTagger
 - [Task 04: snippets](task-04-snippets.md): analyze_song / detect_drop / beat_grid_for_snippet, tempo correction + measured accuracy, song cache, ace snippets add/list
+- [Task 06: render](task-06-render.md): render/validate/execute_plan, filter graph, effects, LUTs, TextRenderStyle, Anton font, drawtext needs ffmpeg-full locally
 - [Task 07: notify](task-07-notify.md): NtfyNotifier, quiet hours (4–7 pm ET window), pending hand-off notifications, FakeNotifier, owner's ntfy setup steps
