@@ -73,7 +73,7 @@ def seeded(db_session: Session) -> dict[str, int]:
 
 
 def make_shot_row(footage_file_id: int, index: int, **overrides: Any) -> ShotRow:
-    """Shaped like `engine.ingest.job.shot_to_row` output; `category=None` marks untagged."""
+    """Shaped like `engine.ingest.shot_rows.shot_to_row` output; `category=None` marks untagged."""
     tags = {
         "category": "city_night",
         "subject": "person",

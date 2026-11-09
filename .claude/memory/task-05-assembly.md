@@ -44,11 +44,11 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
 - Effect events are sorted by `(start_s, effect)`.
 - Text: if `on_screen_text != none` and `text` isn't blank, one `TextEvent` from 0 to the end in `recipe.text_style`. Otherwise no text events.
 
-## `engine/recipes/batch.py`: `plan_batch(session, settings: Settings, rng, now, n) -> list[RenderPlan]`
+## `engine/recipes/batch.py`: `plan_batch(session, settings: Settings, rng, now, n, *, snippet_id=None) -> list[RenderPlan]`
 - Inputs:
   - `settings.recipes.fixed`;
-  - active snippets whose song has a `bpm`. The grid is the song's beats/downbeats inside `[start_s, end_s]` shifted to snippet time, and `drop_s - start_s` when the drop falls in the window;
-  - shots with `proxy_path`, `category`, `motion_score` and `quality_score` set, converted by `engine/recipes/shot_rows.py: shot_from_row`. That's the lossless inverse of slice 2's `engine.ingest.job.shot_to_row`: tags come from `tags_json`, the full `ShotTags` dump. It's round-trip tested in `tests/integration/test_recipes_shot_rows.py`, and the main agent plans to consolidate the two into one shared place.
+  - active snippets (only `snippet_id` when given, added by task 11) whose song has a `bpm` and `duration_s`. The grid comes from slice 4's `beat_grid_for_snippet`; a stored drop outside the window is passed as None, so it plans with no drop;
+  - shots with `proxy_path`, `category`, `motion_score` and `quality_score` set, converted by `engine/ingest/shot_rows.py: shot_from_row`, the lossless inverse of `shot_to_row` in the same module: tags come from `tags_json`, the full `ShotTags` dump. It's round-trip tested in `tests/integration/test_shot_rows_roundtrip.py`.
 - Each plan:
   - draws the shuffled (recipe, snippet with matching `snippet_type`) pairs whose recipe is under `max_repeats_per_week`. That counts non-failed renders with `created_at > now - 7 d`, plus this batch.
   - tries pairs until `select_shots` succeeds. A failing pair is logged and skipped. When no pair works, the batch stops early (and may be empty).
@@ -74,6 +74,5 @@ Mutation-checked: each property fails for its matching bug.
 ## Gotchas
 - `one_long_shot` with no in-video drop needs a single shot as long as the whole video. With `ingest.max_shot_s = 8`, it can't be filled for lengths of 12 or 20, so the pair is skipped. None of the fixed recipes use it.
 - A 4-render batch can need up to 56 distinct shots (the every_beat/7 s recipe uses 14 slots). A small library yields fewer plans, not an error.
-- `_beat_grid` in batch.py duplicates what slice 4's `beat_grid_for_snippet` will do. Feature modules shouldn't import each other's internals, and that function was still a stub when this was written. Unify them if they ever drift.
-- `_beat_grid` treats a drop outside the snippet window as no drop, while slice 4's `beat_grid_for_snippet` raises for one.
+- `_beat_grid` in batch.py now calls slice 4's `beat_grid_for_snippet` (task 11). That function raises for a drop outside the window, so `_beat_grid` pre-checks and passes None instead (`tests/integration/test_render_batch_drop_window.py`).
 - Run: `uv run pytest tests/unit/test_recipes_*.py tests/integration/test_recipes_*.py`.
