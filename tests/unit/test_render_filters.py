@@ -17,6 +17,7 @@ from engine.recipes.models import (
 )
 from engine.render.filters import (
     VIDEO_OUTPUT_LABEL,
+    TextRenderStyle,
     build_filter_graph,
     escape_filter_value,
     lut_path_for,
@@ -221,3 +222,28 @@ def test_speed_ramp_retimes_its_window_and_keeps_the_frame_rate(
     graph = build_filter_graph(make_timeline(effects=effects), settings)
 
     assert "setpts='if(between(T,1.0,2.0),1.0+1.0*sqrt((T-1.0)/1.0),T)/TB',fps=30" in graph
+
+
+def test_text_render_style_is_passed_in_rather_than_fixed(settings: RenderSettings) -> None:
+    text = TextEvent(text="hi", start_s=0, end_s=1)
+    style = TextRenderStyle(
+        font_file=Path("/fonts/other.otf"),
+        size_fraction=0.05,
+        color="yellow",
+        border_px=2,
+        border_color="0x000000@0.5",
+    )
+    graph = build_filter_graph(make_timeline(texts=(text,)), settings, text_style=style)
+
+    assert "fontfile='/fonts/other.otf'" in graph
+    assert "fontsize=96" in graph
+    assert "fontcolor='yellow'" in graph
+    assert "borderw=2" in graph
+    assert "bordercolor='0x000000@0.5'" in graph
+
+
+def test_default_text_style_uses_the_configured_font(settings: RenderSettings) -> None:
+    style = TextRenderStyle.default(settings)
+
+    assert style.font_file == Path("/fonts/text.ttf")
+    assert style.color == "white"

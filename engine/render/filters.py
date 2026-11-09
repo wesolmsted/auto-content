@@ -7,6 +7,7 @@ the look's LUT and the text overlays.
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from engine.config import RenderSettings
@@ -25,14 +26,27 @@ VIDEO_OUTPUT_LABEL = "video"
 ZOOM_PUNCH_AMOUNT = 0.15
 FLASH_BRIGHTNESS = 0.6
 SHAKE_MARGIN_FRACTION = 0.02
-TEXT_SIZE_FRACTION = 0.045
-TEXT_BORDER_PX = 5
 
 TEXT_Y_BY_POSITION = {
     TextPosition.TOP: "h*0.12",
     TextPosition.CENTER: "(h-text_h)/2",
     TextPosition.LOWER_THIRD: "h*0.70-text_h/2",
 }
+
+
+@dataclass(frozen=True)
+class TextRenderStyle:
+    """How burned-in text looks. `size_fraction` is the font size as a fraction of frame height."""
+
+    font_file: Path
+    size_fraction: float = 0.045
+    color: str = "white"
+    border_px: int = 5
+    border_color: str = "black"
+
+    @classmethod
+    def default(cls, settings: RenderSettings) -> "TextRenderStyle":
+        return cls(font_file=settings.font_file)
 
 
 def escape_filter_value(value: str) -> str:
@@ -52,7 +66,9 @@ def lut_path_for(look: Look, luts_dir: Path) -> Path | None:
     return luts_dir / f"{look.value}.cube"
 
 
-def build_filter_graph(timeline: Timeline, settings: RenderSettings) -> str:
+def build_filter_graph(
+    timeline: Timeline, settings: RenderSettings, text_style: TextRenderStyle | None = None
+) -> str:
     size = f"{settings.width}:{settings.height}"
     chains = []
     for index, segment in enumerate(timeline.segments):
@@ -70,7 +86,8 @@ def build_filter_graph(timeline: Timeline, settings: RenderSettings) -> str:
     lut_path = lut_path_for(timeline.look, settings.luts_dir)
     if lut_path is not None:
         filters.append(f"lut3d=file={escape_filter_value(str(lut_path))}")
-    filters += [_drawtext(text, settings) for text in timeline.texts]
+    text_style = text_style or TextRenderStyle.default(settings)
+    filters += [_drawtext(text, text_style, settings) for text in timeline.texts]
     filters.append(f"format=yuv420p[{VIDEO_OUTPUT_LABEL}]")
     chains.append(",".join(filters))
     return ";".join(chains)
@@ -136,15 +153,15 @@ def _flash(event: EffectEvent) -> str:
     )
 
 
-def _drawtext(text: TextEvent, settings: RenderSettings) -> str:
+def _drawtext(text: TextEvent, style: TextRenderStyle, settings: RenderSettings) -> str:
     options = [
-        f"fontfile={escape_filter_value(str(settings.font_file))}",
+        f"fontfile={escape_filter_value(str(style.font_file))}",
         f"text={escape_filter_value(_apply_case(text.text, text.style.case))}",
         "expansion=none",
-        f"fontsize={round(settings.height * TEXT_SIZE_FRACTION)}",
-        "fontcolor=white",
-        f"borderw={TEXT_BORDER_PX}",
-        "bordercolor=black",
+        f"fontsize={round(settings.height * style.size_fraction)}",
+        f"fontcolor={escape_filter_value(style.color)}",
+        f"borderw={style.border_px}",
+        f"bordercolor={escape_filter_value(style.border_color)}",
         "x=(w-text_w)/2",
         f"y={TEXT_Y_BY_POSITION[text.style.position]}",
         f"enable='between(t,{_seconds(text.start_s)},{_seconds(text.end_s)})'",
