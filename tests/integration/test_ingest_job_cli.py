@@ -20,7 +20,7 @@ runner = CliRunner()
 
 class UnusedTagger:
     def tag_shot(self, frames: list[Path]) -> ShotTags:
-        raise AssertionError("not called while build_shots is unbuilt")
+        raise AssertionError("not called: the test file isn't a readable video")
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_ingest_footage_runs_the_job_and_reports_counts(
     assert "built=0" in result.output
     [row] = footage_rows()
     assert row.status == FootageStatus.DOWNLOADED
-    assert (row.error or "").startswith("NotImplementedError")
+    assert (row.error or "").startswith("FfmpegError")
     assert Path(row.local_path or "").parent == data_dir.resolve() / "media" / "scratch"
     assert len(tagger_settings) == 1
 

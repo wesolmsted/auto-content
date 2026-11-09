@@ -13,6 +13,7 @@ from engine.ingest.models import PollSummary, QualityIssue, Shot, ShotTags
 from engine.storage.media_store import LocalMediaStore, MediaKind, MediaStore
 from engine.vision.tagger import VisionTagError, VisionTagger
 from tests.fakes.drive import FakeDriveClient
+from tests.fakes.vision import FakeVisionTagger
 
 REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 INBOX = "inbox"
@@ -93,7 +94,7 @@ class Job:
     store: LocalMediaStore
     drive_settings: DriveSettings
     ingest_settings: IngestSettings
-    tagger: UnusedTagger = field(default_factory=UnusedTagger)
+    tagger: VisionTagger = field(default_factory=UnusedTagger)
 
     def run(self, build: FakeShotBuilder | None = None) -> FootageIngestSummary:
         if build is None:
@@ -255,15 +256,30 @@ def test_a_build_that_finds_no_shots_is_recorded_as_an_error(job: Job) -> None:
     assert "no shots" in (row.error or "")
 
 
-def test_the_unbuilt_real_shot_builder_is_recorded_not_raised(job: Job) -> None:
-    job.drive.add_file(INBOX, "f1", b"first")
+def test_the_real_shot_builder_turns_a_drive_clip_into_tagged_shots(
+    job: Job, portrait_scenes_clip: Path
+) -> None:
+    job.tagger = FakeVisionTagger()
+    job.drive.add_file(INBOX, "f1", portrait_scenes_clip.read_bytes())
+
+    summary = job.run()
+
+    assert (summary.built, summary.shots, summary.completed) == (1, 4, 1)
+    assert job.footage()["f1"].status == FootageStatus.DONE
+    assert [round(shot.start_s, 2) for shot in job.shots()] == [0.0, 2.5, 5.0, 7.5]
+
+
+def test_an_unreadable_file_fails_in_the_real_builder_and_is_recorded_not_raised(
+    job: Job,
+) -> None:
+    job.drive.add_file(INBOX, "f1", b"not a video")
 
     summary = job.run()
 
     assert summary.built == 0
     row = job.footage()["f1"]
     assert row.status == FootageStatus.DOWNLOADED
-    assert (row.error or "").startswith("NotImplementedError")
+    assert (row.error or "").startswith("FfmpegError")
     assert row.attempts == 1
 
 
