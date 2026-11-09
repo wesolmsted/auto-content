@@ -93,12 +93,8 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
 @pytest.mark.parametrize(
     "argv",
     [
-        ["auth", "meta"],
-        ["auth", "tiktok"],
         ["ingest", "references"],
         ["ingest", "exports"],
-        ["measure", "due"],
-        ["posts", "link", "1", "ig_trial", "https://www.instagram.com/reel/abc/"],
         ["learn", "update"],
         ["report", "weekly"],
     ],
