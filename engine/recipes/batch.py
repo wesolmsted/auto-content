@@ -5,7 +5,6 @@ import random
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -14,10 +13,11 @@ from sqlalchemy.orm import Session
 from engine.config import Settings
 from engine.db.enums import Platform, RenderStatus, SnippetType
 from engine.db.models import RenderRow, ShotRow, SnippetRow, SongRow
-from engine.ingest.models import Shot, ShotTags
+from engine.ingest.models import Shot
 from engine.recipes.assembly import assemble
 from engine.recipes.models import Recipe, RenderPlan
 from engine.recipes.selection import select_shots
+from engine.recipes.shot_rows import shot_from_row
 from engine.recipes.slots import NotEnoughShotsError
 from engine.snippets.models import BeatGrid
 
@@ -161,45 +161,12 @@ def _tagged_shots(session: Session) -> list[Shot]:
         .where(
             ShotRow.proxy_path.is_not(None),
             ShotRow.category.is_not(None),
-            ShotRow.subject.is_not(None),
-            ShotRow.setting.is_not(None),
-            ShotRow.lighting.is_not(None),
-            ShotRow.mood.is_not(None),
             ShotRow.motion_score.is_not(None),
             ShotRow.quality_score.is_not(None),
         )
         .order_by(ShotRow.id)
     )
-    return [_shot_from_row(row) for row in rows]
-
-
-def _shot_from_row(row: ShotRow) -> Shot:
-    quality = row.quality_score or 0.0
-    return Shot(
-        id=row.id,
-        footage_file_id=row.footage_file_id,
-        start_s=row.start_s,
-        end_s=row.end_s,
-        width=row.width,
-        height=row.height,
-        fps=row.fps,
-        orientation=row.orientation,
-        motion_score=row.motion_score or 0.0,
-        quality_score=quality,
-        tags=ShotTags(
-            category=row.category or "",
-            subject=row.subject or "",
-            setting=row.setting or "",
-            lighting=row.lighting or "",
-            mood=row.mood or "",
-            has_face=row.has_face,
-            quality=quality,
-        ),
-        proxy_path=Path(row.proxy_path or ""),
-        thumbnail_path=Path(row.thumbnail_path) if row.thumbnail_path else None,
-        use_count=row.use_count,
-        last_used_at=row.last_used_at,
-    )
+    return [shot_from_row(row) for row in rows]
 
 
 def _recent_render_counts(session: Session, now: datetime) -> Counter[str]:

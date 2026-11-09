@@ -73,6 +73,17 @@ def seeded(db_session: Session) -> dict[str, int]:
 
 
 def make_shot_row(footage_file_id: int, index: int, **overrides: Any) -> ShotRow:
+    """Shaped like `engine.ingest.job.shot_to_row` output; `category=None` marks untagged."""
+    tags = {
+        "category": "city_night",
+        "subject": "person",
+        "setting": "street",
+        "lighting": "night",
+        "mood": "energetic",
+        "has_face": False,
+        "quality": 0.8,
+        "issues": [],
+    }
     values: dict[str, Any] = {
         "footage_file_id": footage_file_id,
         "start_s": index * 10.0,
@@ -90,7 +101,7 @@ def make_shot_row(footage_file_id: int, index: int, **overrides: Any) -> ShotRow
         "motion_score": (index % 10) / 10,
         "quality_score": 0.8,
         "has_face": False,
-        "tags_json": {},
+        "tags_json": tags if overrides.get("category", "city_night") else {},
         "proxy_path": f"/data/media/shots/{index}.mp4",
     }
     return ShotRow(**(values | overrides))
