@@ -72,7 +72,7 @@ Two long-lived processes at most: the scheduler (launchd locally, cron/cloud sch
 | `ace ingest footage` | every 30 min | Poll, download, split, tag. |
 | `ace ingest references` | every 30 min | Phase 3. |
 | `ace ingest exports` | daily | Imports TikTok Studio export files from Drive (§7.6). |
-| `ace render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4) and sends one notification per finished render. |
+| `ace render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4). Their notifications are held until the 4–7 pm ET posting window (§7.5). |
 | `ace measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
 | `ace learn update` | daily, after measure | Recomputes variable scores. Phase 2. |
 | `ace report weekly` | Mondays 07:00 | Report + shoot list. Phase 2. |
@@ -312,15 +312,19 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
 Phase 1 ships **3 fixed recipes** from config. Phase 2 replaces fixed recipes with sampling (§7.7).
 
 ### 7.4 Render (Phase 1)
-- `render(timeline, snippet_audio, out_path)` builds a single FFmpeg filter graph: per-segment `trim` → reframe to 1080×1920 (center crop; face-aware crop is a later improvement) → effects → `concat` → LUT (`lut3d`) → text (`drawtext` with bundled fonts) → mux snippet audio → H.264 High / AAC, 30 fps, `+faststart`.
+- `render(timeline, snippet_audio, out_path)` builds a single FFmpeg filter graph: per-segment `trim` → reframe to 1080×1920 (center crop; face-aware crop is a later improvement) → effects → `concat` → LUT (`lut3d`) → text (`drawtext` with bundled fonts; see "Native-looking text" below) → mux snippet audio → H.264 High / AAC, 30 fps, `+faststart`.
 - The exact FFmpeg argv is logged and stored alongside the render for reproducibility.
 - Output validated with `ffprobe` (duration within ±1 frame of plan, 9:16, has audio).
 - Captions per target, templated from config for v1 (open question in §14).
+- **Native-looking text** (follow-up task after slice 6): burned-in text should look like text added in the app.
+  - **Fonts:** bundle **TikTok Sans** (TikTok's own app font, open source under SIL OFL 1.1). Instagram's in-app font (Instagram Sans) isn't openly licensed, so the IG preset uses the closest OFL match, and the owner can drop their own font file into `data_dir/fonts/` and point the preset at it.
+  - **Styles:** presets copy the in-app looks: plain white with a soft shadow, outline, and a rounded background box (white box with black text, or black with white). Text sits inside the platform safe zones, clear of the caption and button overlays.
+  - **Text source:** `ace snippets add --text "<hook lyric>"` stores the hook text on the snippet, and recipes with `on_screen_text = hook_lyric` use it.
 - On success: status → `ready`, then send the hand-off notification (§7.5). If the notification fails, the render stays `ready` with `notified_at` NULL, and the next run retries the notification.
 
 ### 7.5 Hand-off and approval (Phase 1)
 
-**Notification.** A `Notification` per ready render through `Notifier` (ntfy: `POST https://ntfy.sh/<topic>` or a self-hosted server). Fields: title `"Hand-off ready: <song> · <recipe short name>"`, body with length and targets, `Click` header = the hand-off page URL (Tailscale hostname), tag for the platform icons. The topic name is a long random string kept in secrets (anyone who knows a public ntfy topic can read it). Quiet hours from config: notifications due inside them are held until the window ends.
+**Notification.** A `Notification` per ready render through `Notifier` (ntfy: `POST https://ntfy.sh/<topic>` or a self-hosted server). Fields: title `"Hand-off ready: <song> · <recipe short name>"`, body with length and targets, `Click` header = the hand-off page URL (Tailscale hostname), tag for the platform icons. The topic name is a long random string kept in secrets (anyone who knows a public ntfy topic can read it). **Posting window:** the owner posts only in prime time, 4–7 pm US Eastern (`America/New_York`, so it follows DST). This is set as quiet hours from 19:00 to 16:00 in `notify.quiet_hours`. Notifications due inside quiet hours are held until 16:00, so every hand-off arrives during the posting window.
 
 **Hand-off page** (`ace serve`, FastAPI on the Mac, reached over Tailscale). Auth: a long random token in a cookie set once via `/login?token=…`; Tailscale is the network boundary.
 - `/` lists `ready` renders (newest first) and recent `approved` ones awaiting a post.
@@ -518,3 +522,4 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | Where does song audio come from? | Local file passed to `snippets add`. |
 | Which renders also target TikTok in Phase 1? | One render per day (config); Phase 2 switches to proven recipes. |
 | Face-aware 9:16 reframing? | Center crop in Phase 1; revisit if rejections cite framing. |
+| Closest openly licensed match for Instagram's in-app text font? | Compare candidates (e.g. Instrument Sans) side by side against an in-app screenshot during the native-text task; the owner can supply their own font file. |
