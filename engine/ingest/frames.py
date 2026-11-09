@@ -21,6 +21,12 @@ def frame_time_s(frame: int, fps: float) -> float:
     return math.floor(frame / fps * 1000) / 1000
 
 
+def downscale_filter(width: int, height: int, max_long_side: int) -> str:
+    """ffmpeg filter that shrinks (never enlarges) a frame so its long side fits, even sides."""
+    scale = min(1.0, max_long_side / max(width, height))
+    return f"scale={int(width * scale) // 2 * 2}:{int(height * scale) // 2 * 2}"
+
+
 def extract_frame(
     video_path: Path,
     frame: int,
