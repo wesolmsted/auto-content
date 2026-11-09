@@ -61,6 +61,11 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["engine", "tests"]
+# The local alembic/ migrations folder would otherwise make the library look first-party.
+known-third-party = ["alembic"]
+
 [tool.mypy]
 strict = true
 python_version = "3.12"
