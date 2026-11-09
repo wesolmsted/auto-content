@@ -103,7 +103,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
         ["snippets", "list"],
         ["render", "batch", "--n", "2", "--dry-run"],
         ["render", "one", "--recipe", "rcp_0123456789ab", "--snippet", "1"],
-        ["notify", "test"],
         ["serve", "--port", "8001"],
         ["measure", "due"],
         ["posts", "link", "1", "ig_trial", "https://www.instagram.com/reel/abc/"],
