@@ -28,4 +28,18 @@ def beat_grid_for_snippet(
 
     `drop_s` is an absolute song time (detected or owner override) or None.
     """
-    raise NotImplementedError
+    if end_s <= start_s:
+        raise ValueError(f"end_s ({end_s}) must be after start_s ({start_s})")
+    if drop_s is not None and not start_s <= drop_s <= end_s:
+        raise ValueError(f"drop_s ({drop_s}) must lie within [{start_s}, {end_s}]")
+
+    def relative(times: tuple[float, ...]) -> tuple[float, ...]:
+        return tuple(time - start_s for time in times if start_s <= time <= end_s)
+
+    return BeatGrid(
+        bpm=song.bpm,
+        beats=relative(song.beats),
+        downbeats=relative(song.downbeats),
+        drop_s=None if drop_s is None else drop_s - start_s,
+        duration_s=end_s - start_s,
+    )
