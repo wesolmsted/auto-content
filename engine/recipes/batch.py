@@ -31,8 +31,6 @@ class SnippetChoice:
     id: int
     snippet_type: SnippetType
     beat_grid: BeatGrid
-    song_title: str
-    label: str
 
 
 def plan_batch(
@@ -46,6 +44,7 @@ def plan_batch(
     fill are skipped; the batch is shorter when no pair is left. Every plan targets `ig_trial`;
     the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
     `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
+    Captions are left empty: the render step fills them from the config templates.
     """
     snippets = _active_snippets(session)
     library = _tagged_shots(session)
@@ -79,12 +78,7 @@ def plan_batch(
                 snippet_id=snippet.id,
                 timeline=assemble(recipe, shots, snippet.beat_grid),
                 targets=tuple(targets),
-                captions={
-                    target: settings.captions.templates[target].format(
-                        song=snippet.song_title, snippet=snippet.label
-                    )
-                    for target in targets
-                },
+                captions={},
             )
         )
         repeats[recipe.id] += 1
@@ -129,8 +123,6 @@ def _active_snippets(session: Session) -> list[SnippetChoice]:
             id=snippet.id,
             snippet_type=snippet.snippet_type,
             beat_grid=_beat_grid(snippet, song),
-            song_title=song.title,
-            label=snippet.label or "",
         )
         for snippet, song in rows
     ]

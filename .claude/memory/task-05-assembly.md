@@ -54,7 +54,7 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
   - tries pairs until `select_shots` succeeds. A failing pair is logged and skipped. When no pair works, the batch stops early (and may be empty).
   - marks the shots it used with `last_used_at = now` in memory, so the cooldown keeps them out of later plans.
 - Targets: always `ig_trial`. The first `tiktok_renders_per_day` plans of the owner's local day also get `tiktok`. The day is in `notify.timezone`, and non-failed renders already created today with "tiktok" in `targets_json` count toward the limit. With `tiktok_every_render`, every plan gets `tiktok`.
-- Captions: `captions.templates[target].format(song=title, snippet=label or "")` for each target.
+- Captions: left empty (`{}`). The render step's `execute_plan` uses a non-empty `plan.captions[target]` when present, and otherwise fills the config template.
 - Writes nothing: no renders, no recipe rows, no `use_count`/`last_used_at` updates. The render/integration step must insert the `recipes` row (FK) and update the shots' usage.
 - Passes `text=None` to `assemble`, since there's no lyric/caption source yet. The fixed recipes all use `on_screen_text = none`.
 
