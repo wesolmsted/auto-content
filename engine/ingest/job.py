@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from engine.config import DriveSettings, IngestSettings
 from engine.db.enums import FootageStatus
-from engine.db.models import FootageFileRow, ShotRow
+from engine.db.models import FootageFileRow
 from engine.drive.client import DriveClient
 from engine.ingest.models import PollSummary, Shot
 from engine.ingest.poller import (
@@ -19,6 +19,7 @@ from engine.ingest.poller import (
     poll_footage,
     record_failure,
 )
+from engine.ingest.shot_rows import shot_to_row
 from engine.ingest.shots import build_shots
 from engine.storage.media_store import MediaStore
 from engine.vision.tagger import VisionTagger
@@ -83,32 +84,6 @@ def run_footage_ingest(
     session.commit()
     return FootageIngestSummary(
         poll=poll, built=built, shots=shot_count, completed=completed, failed=failed + failed_moves
-    )
-
-
-def shot_to_row(shot: Shot) -> ShotRow:
-    return ShotRow(
-        footage_file_id=shot.footage_file_id,
-        start_s=shot.start_s,
-        end_s=shot.end_s,
-        duration_s=shot.duration_s,
-        width=shot.width,
-        height=shot.height,
-        fps=shot.fps,
-        orientation=shot.orientation,
-        category=shot.tags.category,
-        subject=shot.tags.subject,
-        setting=shot.tags.setting,
-        lighting=shot.tags.lighting,
-        mood=shot.tags.mood,
-        motion_score=shot.motion_score,
-        quality_score=shot.quality_score,
-        has_face=shot.tags.has_face,
-        tags_json=shot.tags.model_dump(mode="json"),
-        proxy_path=str(shot.proxy_path),
-        thumbnail_path=str(shot.thumbnail_path) if shot.thumbnail_path else None,
-        use_count=shot.use_count,
-        last_used_at=shot.last_used_at,
     )
 
 

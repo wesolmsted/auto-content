@@ -14,10 +14,10 @@ from engine.config import Settings
 from engine.db.enums import Platform, RenderStatus, SnippetType
 from engine.db.models import RenderRow, ShotRow, SnippetRow, SongRow
 from engine.ingest.models import Shot
+from engine.ingest.shot_rows import shot_from_row
 from engine.recipes.assembly import assemble
 from engine.recipes.models import Recipe, RenderPlan
 from engine.recipes.selection import select_shots
-from engine.recipes.shot_rows import shot_from_row
 from engine.recipes.slots import NotEnoughShotsError
 from engine.snippets.models import BeatGrid
 
