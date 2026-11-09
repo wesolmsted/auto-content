@@ -437,6 +437,7 @@ ace snippets list
 ace render batch [--n N] [--recipe ID] [--snippet ID] [--dry-run]   # dry-run prints timelines, no notifications
 ace render one --recipe ID --snippet ID                            # dev loop
 ace notify test                 # send a test notification to the phone
+ace notify pending              # send hand-off notifications for ready renders (respects the posting window)
 ace serve [--host --port]       # hand-off page
 ace measure due                 # match posts, then pull due metrics
 ace posts link <render_id> <platform> <url>                        # manual match

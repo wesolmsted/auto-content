@@ -20,3 +20,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 
 - [Prototype first](prototype-first.md): build the simplest working version end to end; defer refinements until usage shows they're needed
 - [Task 01: skeleton](task-01-skeleton.md): map of shared files, contracts, stub signatures, fixture ground truth, checks and gotchas. Read before any slice work
+- [Task 07: notify](task-07-notify.md): NtfyNotifier, quiet hours (4–7 pm ET window), pending hand-off notifications, FakeNotifier, owner's ntfy setup steps
