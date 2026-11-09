@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 
 from engine.config import load_settings
 from engine.db.enums import Platform
-from engine.measure.matching import caption_similarity, match_posts, parse_post_url
+from engine.measure.matching import PostLink, caption_similarity, match_posts, parse_post_url
 from engine.measure.models import AwaitingPost, Match, PlatformVideo
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -153,23 +153,44 @@ def test_empty_inputs_give_no_matches() -> None:
 
 
 @pytest.mark.parametrize(
-    ("platform", "url", "external_ref"),
+    ("platform", "url", "external_id", "permalink"),
     [
-        (Platform.IG_TRIAL, "https://www.instagram.com/reel/DAbc-12_x/?igsh=xyz", "DAbc-12_x"),
-        (Platform.IG_TRIAL, "https://instagram.com/reel/C9zzTop/", "C9zzTop"),
-        (Platform.IG_TRIAL, "https://www.instagram.com/p/C9zzTop/", "C9zzTop"),
+        (
+            Platform.IG_TRIAL,
+            "https://www.instagram.com/reel/DAbc-12_x/?igsh=xyz",
+            "DAbc-12_x",
+            "https://www.instagram.com/reel/DAbc-12_x/",
+        ),
+        (
+            Platform.IG_TRIAL,
+            "https://instagram.com/reels/C9zzTop",
+            "C9zzTop",
+            "https://www.instagram.com/reel/C9zzTop/",
+        ),
+        (
+            Platform.IG_TRIAL,
+            "https://www.instagram.com/p/C9zzTop/",
+            "C9zzTop",
+            "https://www.instagram.com/reel/C9zzTop/",
+        ),
         (
             Platform.TIKTOK,
             "https://www.tiktok.com/@some.user/video/7300000000000000001?is_from_webapp=1",
             "7300000000000000001",
+            "https://www.tiktok.com/@some.user/video/7300000000000000001",
         ),
-        (Platform.TIKTOK, "tiktok.com/@u/video/7300000000000000002", "7300000000000000002"),
+        (
+            Platform.TIKTOK,
+            "tiktok.com/@u/video/7300000000000000002",
+            "7300000000000000002",
+            "https://www.tiktok.com/@u/video/7300000000000000002",
+        ),
     ],
 )
-def test_parse_post_url_extracts_the_reel_code_or_video_id(
-    platform: Platform, url: str, external_ref: str
+def test_parse_post_url_gives_the_reel_code_or_video_id_and_a_canonical_link(
+    platform: Platform, url: str, external_id: str, permalink: str
 ) -> None:
-    assert parse_post_url(platform, url) == external_ref
+    assert parse_post_url(platform, url) == PostLink(external_id=external_id, permalink=permalink)
 
 
 @pytest.mark.parametrize(
