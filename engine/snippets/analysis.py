@@ -152,3 +152,12 @@ def beat_grid_for_snippet(
         drop_s=None if drop_s is None else drop_s - start_s,
         duration_s=end_s - start_s,
     )
+
+
+def snap_start_to_downbeat(downbeats: tuple[float, ...], start_s: float, end_s: float) -> float:
+    """Pure: the downbeat nearest `start_s` that is strictly before `end_s`, the earlier one on a
+    tie, so a snippet (and its video) starts on a bar. Raises ValueError if there is none."""
+    candidates = [downbeat for downbeat in downbeats if downbeat < end_s]
+    if not candidates:
+        raise ValueError(f"no downbeat before {end_s:.2f} s to start the snippet on")
+    return min(candidates, key=lambda downbeat: (abs(downbeat - start_s), downbeat))

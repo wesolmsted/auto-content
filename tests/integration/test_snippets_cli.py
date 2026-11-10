@@ -56,7 +56,9 @@ def test_add_analyzes_the_song_and_detects_the_drop(click_track_wav: Path) -> No
     assert len(song.beats_json) == 40
     assert snippet.song_id == song.id
     assert snippet.snippet_type == SnippetType.DROP
-    assert (snippet.start_s, snippet.end_s, snippet.label) == (4.0, 14.0, "big")
+    assert snippet.start_s in song.downbeats_json
+    assert snippet.start_s == pytest.approx(4.0, abs=0.02)
+    assert (snippet.end_s, snippet.label) == (14.0, "big")
     assert snippet.drop_s == pytest.approx(CLICK_DROP_S, abs=0.02)
     assert snippet.drop_s in song.downbeats_json
 
@@ -149,7 +151,7 @@ def test_list_prints_one_row_per_snippet(click_track_wav: Path) -> None:
     header, *rows = [line.split() for line in result.output.splitlines() if line.strip()]
     assert header == ["id", "song", "type", "start", "end", "drop", "label"]
     assert rows == [
-        ["1", "click_120bpm", "drop", "4.00", "14.00", "7.99", "big"],
+        ["1", "click_120bpm", "drop", "3.99", "14.00", "7.99", "big"],
         ["2", "click_120bpm", "hook", "0.00", "6.00", "-", "-"],
     ]
 
@@ -160,3 +162,64 @@ def test_list_with_no_snippets_says_so() -> None:
 
     assert result.exit_code == 0
     assert "no snippets" in result.output
+
+
+@pytest.mark.usefixtures("initialized_env")
+def test_start_is_snapped_to_the_nearest_downbeat_and_reported(click_track_wav: Path) -> None:
+    result = runner.invoke(
+        app, add(click_track_wav, "--start", "4.6", "--end", "14", "--type", "hook")
+    )
+
+    assert result.exit_code == 0, result.output
+    [song], [snippet] = stored_rows()
+    assert snippet.start_s in song.downbeats_json
+    assert snippet.start_s == pytest.approx(4.0, abs=0.02)
+    assert snippet.end_s == 14.0
+    assert f"start snapped 4.60 → {snippet.start_s:.2f} s (downbeat)" in result.output
+
+
+@pytest.mark.usefixtures("initialized_env")
+def test_start_already_on_a_downbeat_is_not_reported_as_snapped(click_track_wav: Path) -> None:
+    first = runner.invoke(
+        app, add(click_track_wav, "--start", "4.6", "--end", "14", "--type", "hook")
+    )
+    assert first.exit_code == 0, first.output
+    _, [snippet] = stored_rows()
+
+    second = runner.invoke(
+        app, add(click_track_wav, "--start", repr(snippet.start_s), "--end", "14", "--type", "hook")
+    )
+
+    assert second.exit_code == 0, second.output
+    assert "snapped" not in second.output
+    _, snippets = stored_rows()
+    assert snippets[1].start_s == snippet.start_s
+
+
+@pytest.mark.usefixtures("initialized_env")
+def test_drop_override_is_checked_against_the_snapped_window(click_track_wav: Path) -> None:
+    earlier_than_typed = runner.invoke(
+        app,
+        add(click_track_wav, "--start", "4.6", "--end", "14", "--type", "drop", "--drop", "4.2"),
+    )
+    before_snapped = runner.invoke(
+        app,
+        add(click_track_wav, "--start", "3.5", "--end", "14", "--type", "drop", "--drop", "3.8"),
+    )
+
+    assert earlier_than_typed.exit_code == 0, earlier_than_typed.output
+    assert before_snapped.exit_code == 1
+    assert "--drop" in before_snapped.output
+    _, snippets = stored_rows()
+    assert [snippet.drop_s for snippet in snippets] == [4.2]
+
+
+@pytest.mark.usefixtures("initialized_env")
+def test_drop_is_detected_in_the_snapped_window(click_track_wav: Path) -> None:
+    result = runner.invoke(
+        app, add(click_track_wav, "--start", "8.8", "--end", "14", "--type", "drop")
+    )
+
+    assert result.exit_code == 0, result.output
+    _, [snippet] = stored_rows()
+    assert snippet.drop_s == pytest.approx(CLICK_DROP_S, abs=0.02)
