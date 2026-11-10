@@ -37,15 +37,19 @@ def run_render_batch(
     n: int,
     *,
     snippet_id: int | None = None,
+    ignore_limits: bool = False,
 ) -> BatchSummary:
     """Plan up to `n` renders and execute each one, then send the pending hand-off notifications.
 
     Each plan's `recipes` row is created if missing. A ready render adds one to its shots'
     `use_count` and sets `last_used_at = now`; a failed render is left `failed` and the batch
     continues. Notifications respect quiet hours, so a morning batch's are held. With no
-    notifier, nothing is sent and the renders stay pending. Commits.
+    notifier, nothing is sent and the renders stay pending. `ignore_limits` is passed to
+    `plan_batch`. Commits.
     """
-    plans = plan_batch(session, settings, rng, now, n, snippet_id=snippet_id)
+    plans = plan_batch(
+        session, settings, rng, now, n, snippet_id=snippet_id, ignore_limits=ignore_limits
+    )
     recipes = {recipe.id: recipe for recipe in settings.recipes.fixed}
 
     ready = 0

@@ -132,7 +132,7 @@ def allowed_cuts(recipe: Recipe, grid: BeatGrid) -> set[float]:
         CutRate.EVERY_BEAT: grid.beats,
         CutRate.EVERY_2_BEATS: grid.beats[::2],
         CutRate.DOWNBEATS: grid.downbeats,
-        CutRate.ONE_LONG_SHOT: (),
+        CutRate.ONE_LONG_SHOT: grid.beats,
     }[recipe.cut_rate]
     allowed = set(grid_cuts)
     if recipe.hard_cut_on_drop and grid.drop_s is not None:
@@ -281,3 +281,55 @@ def test_selection_is_deterministic_for_a_seed(
         return [shot.id for shot in chosen]
 
     assert run() == run()
+
+
+@st.composite
+def long_shot_cases(draw: st.DrawFn) -> tuple[Recipe, BeatGrid, list[Shot], int]:
+    """`one_long_shot` recipes over shots shorter than the video, as from `ingest.max_shot_s`."""
+    recipe = draw(recipes).model_copy(
+        update={"cut_rate": CutRate.ONE_LONG_SHOT, "footage_category": FootageCategory.MIXED}
+    )
+    grid = draw(beat_grids())
+    durations = draw(st.lists(st.floats(0.05, 8), min_size=1, max_size=20))
+    shots = [make_shot(index + 1, duration) for index, duration in enumerate(durations)]
+    return recipe, grid, shots, draw(st.integers(0, 2**32))
+
+
+@settings(max_examples=300)
+@given(long_shot_cases())
+def test_one_long_shot_cuts_on_the_last_beat_each_shot_covers(
+    case: tuple[Recipe, BeatGrid, list[Shot], int],
+) -> None:
+    recipe, grid, library, seed = case
+    try:
+        chosen = select_shots(recipe, library, grid, random.Random(seed), RECIPE_SETTINGS, NOW)
+    except NotEnoughShotsError:
+        return
+    timeline = assemble(recipe, chosen, grid)
+    assert abs(timeline.duration_s - expected_duration(recipe, grid)) <= FRAME_S
+    assert timeline.shot_ids == [shot.id for shot in chosen]
+    durations = [shot.duration_s for shot in chosen]
+    assert durations == sorted(durations, reverse=True)
+
+    allowed = allowed_cuts(recipe, grid)
+    cuts = cut_times(timeline)
+    for cut in cuts:
+        assert any(abs(cut - time) <= EPSILON for time in allowed), cut
+    drop_s = grid.drop_s
+    forced = [0.0, timeline.duration_s]
+    if (
+        recipe.hard_cut_on_drop
+        and drop_s is not None
+        and MIN_SEGMENT_S <= drop_s <= timeline.duration_s - MIN_SEGMENT_S
+    ):
+        assert drop_s in cuts
+        forced.append(drop_s)
+
+    for segment, shot in zip(timeline.segments, chosen, strict=True):
+        assert segment.source_out_s - segment.source_in_s <= shot.duration_s
+        assert segment.output_end_s - segment.output_start_s >= MIN_SEGMENT_S - EPSILON
+        if segment.output_end_s in forced:
+            continue
+        next_forced = min(time for time in forced if time > segment.output_end_s)
+        reach = min(segment.output_start_s + shot.duration_s, next_forced - MIN_SEGMENT_S)
+        assert not [beat for beat in grid.beats if segment.output_end_s < beat <= reach]

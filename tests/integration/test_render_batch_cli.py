@@ -1,6 +1,6 @@
 import re
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -212,3 +212,74 @@ def test_render_one_exits_1_when_nothing_can_be_planned(snippets: dict[str, int]
     assert result.exit_code == 1
     assert "nothing to render" in result.output
     assert count(RenderRow) == 0
+
+
+@pytest.mark.usefixtures("snippets")
+def test_a_failed_render_makes_the_batch_exit_1_after_the_summary(tmp_path: Path) -> None:
+    with session() as db:
+        for row in db.scalars(select(ShotRow)):
+            row.proxy_path = str(tmp_path / "missing.mp4")
+        db.commit()
+
+    result = runner.invoke(app, ["render", "batch", "--n", "1"])
+
+    assert result.exit_code == 1, result.output
+    assert "planned=1 ready=0 failed=1 notified=0" in result.output
+
+
+def use_every_shot_and_cap_recipe(recipe: str, snippet_id: int) -> None:
+    """Every shot used an hour ago and `recipe` at its weekly cap of renders."""
+    now = datetime.now(UTC)
+    with session() as db:
+        settings = load_settings()
+        params = next(r for r in settings.recipes.fixed if r.id == recipe).canonical_params()
+        db.add(RecipeRow(id=recipe, params_json=params))
+        db.add_all(
+            RenderRow(
+                recipe_id=recipe,
+                snippet_id=snippet_id,
+                timeline_json={},
+                targets_json=["ig_trial"],
+                status=RenderStatus.READY,
+                created_at=now - timedelta(days=day + 1),
+            )
+            for day in range(settings.recipes.max_repeats_per_week)
+        )
+        for row in db.scalars(select(ShotRow)):
+            row.last_used_at = now - timedelta(hours=1)
+        db.commit()
+
+
+def test_render_one_ignores_the_weekly_cap_and_the_shot_cooldown(
+    snippets: dict[str, int],
+) -> None:
+    use_every_shot_and_cap_recipe(recipe_id(2), snippets["hook"])
+
+    result = runner.invoke(
+        app, ["render", "one", "--recipe", recipe_id(2), "--snippet", str(snippets["hook"])]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert re.search(r"render \d+ ready: ", result.output)
+
+
+def test_render_batch_keeps_the_weekly_cap_and_the_shot_cooldown(
+    snippets: dict[str, int],
+) -> None:
+    use_every_shot_and_cap_recipe(recipe_id(2), snippets["hook"])
+
+    result = runner.invoke(
+        app,
+        [
+            "render",
+            "batch",
+            "--recipe",
+            recipe_id(2),
+            "--snippet",
+            str(snippets["hook"]),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "nothing to render" in result.output

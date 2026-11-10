@@ -307,3 +307,111 @@ def test_same_seed_gives_the_same_batch_and_nothing_is_written(
     assert db_session.scalar(select(func.count()).select_from(RenderRow)) == 0
     assert db_session.scalar(select(func.count()).select_from(RecipeRow)) == 0
     assert db_session.scalar(select(func.max(ShotRow.last_used_at))) is None
+
+
+def add_drop_snippets(session: Session, count: int) -> list[int]:
+    song_id = session.scalars(select(SongRow.id).where(SongRow.title == SONG_TITLE)).one()
+    snippets = [
+        SnippetRow(
+            song_id=song_id,
+            label=f"drop {index}",
+            snippet_type=SnippetType.DROP,
+            start_s=10.0,
+            end_s=32.0,
+            drop_s=18.0,
+        )
+        for index in range(count)
+    ]
+    session.add_all(snippets)
+    session.flush()
+    return [snippet.id for snippet in snippets]
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_each_recipe_gets_a_turn_however_many_snippets_match_it(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    add_drop_snippets(db_session, 8)
+    plans = plan(db_session, settings, n=3, seed=seed)
+    assert sorted(render_plan.recipe_id for render_plan in plans) == sorted(
+        recipe.id for recipe in fixed
+    )
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_the_recipe_with_the_fewest_renders_this_week_goes_first(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    for day in range(2):
+        add_render(db_session, fixed[0], seeded["drop"], NOW - timedelta(days=day + 1), [])
+    add_render(db_session, fixed[2], seeded["hook"], NOW - timedelta(days=1), [])
+    add_render(db_session, fixed[1], seeded["drop"], NOW - timedelta(days=9), [])
+    plans = plan(db_session, settings, n=3, seed=seed)
+    recipe_ids = [render_plan.recipe_id for render_plan in plans]
+    assert recipe_ids[0] == fixed[1].id
+    assert sorted(recipe_ids[1:]) == sorted([fixed[1].id, fixed[2].id])
+
+
+def test_ties_between_recipes_are_broken_at_random(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    first_picks = {plan(db_session, settings, n=1, seed=seed)[0].recipe_id for seed in range(30)}
+    assert first_picks == {recipe.id for recipe in fixed}
+
+
+def only(settings: Settings, recipe: Recipe) -> Settings:
+    return settings.model_copy(
+        update={"recipes": settings.recipes.model_copy(update={"fixed": (recipe,)})}
+    )
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_prefers_a_snippet_whose_drop_falls_inside_the_video(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    song_id = db_session.scalars(select(SongRow.id)).one()
+    early_drop = SnippetRow(
+        song_id=song_id, snippet_type=SnippetType.DROP, start_s=20.0, end_s=42.0, drop_s=23.0
+    )
+    db_session.add(early_drop)
+    db_session.flush()
+    # The seeded drop snippet's drop is 8 s in: past the end of the 7 s recipe's video.
+    [render_plan] = plan(db_session, only(settings, fixed[1]), n=1, seed=seed)
+    assert render_plan.snippet_id == early_drop.id
+    assert 3.0 in [segment.output_start_s for segment in render_plan.timeline.segments]
+
+
+def test_falls_back_to_a_snippet_whose_drop_is_past_the_video_end(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    [render_plan] = plan(db_session, only(settings, fixed[1]), n=1)
+    assert render_plan.snippet_id == seeded["drop"]
+    assert render_plan.timeline.duration_s == 7.0
+
+
+def test_ignore_limits_plans_past_the_weekly_cap_and_the_shot_cooldown(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    for day in range(settings.recipes.max_repeats_per_week):
+        add_render(db_session, fixed[0], seeded["drop"], NOW - timedelta(days=day + 1), [])
+    for row in db_session.scalars(select(ShotRow)):
+        row.last_used_at = NOW - timedelta(hours=1)
+    db_session.flush()
+    first_only = only(settings, fixed[0])
+
+    assert plan(db_session, first_only, n=1) == []
+    plans = plan_batch(db_session, first_only, random.Random(1), NOW, 2, ignore_limits=True)
+    assert [render_plan.recipe_id for render_plan in plans] == [fixed[0].id] * 2
+    assert len(plans[0].timeline.shot_ids) == 12

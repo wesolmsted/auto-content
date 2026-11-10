@@ -31,7 +31,10 @@ def batch(
     snippet: Annotated[int | None, typer.Option(help="Only this snippet id.")] = None,
     dry_run: Annotated[bool, typer.Option(help="Print timelines; render nothing.")] = False,
 ) -> None:
-    """Render the day's batch and send a hand-off notification per finished render."""
+    """Render the day's batch and send a hand-off notification per finished render.
+
+    Exits 1 if any render in the batch failed.
+    """
     settings = _only_recipe(load_settings(), recipe)
     count = settings.cadence.renders_per_day if n is None else n
     rng = random.Random()
@@ -62,6 +65,8 @@ def batch(
         f"planned={summary.planned} ready={summary.ready} "
         f"failed={summary.failed} notified={summary.notified}"
     )
+    if summary.failed:
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -69,7 +74,10 @@ def one(
     recipe: Annotated[str, typer.Option(help="Recipe id.")],
     snippet: Annotated[int, typer.Option(help="Snippet id.")],
 ) -> None:
-    """Render a single recipe on a single snippet (dev loop)."""
+    """Render a single recipe on a single snippet (dev loop).
+
+    Ignores `recipes.max_repeats_per_week` and `recipes.shot_cooldown_days`.
+    """
     settings = _only_recipe(load_settings(), recipe)
     engine = _open_database(settings)
     try:
@@ -83,6 +91,7 @@ def one(
                 datetime.now(UTC),
                 1,
                 snippet_id=snippet,
+                ignore_limits=True,
             )
             if summary.planned == 0:
                 typer.echo("nothing to render: see the log for why the pair was skipped")
