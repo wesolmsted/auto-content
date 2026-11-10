@@ -55,13 +55,13 @@ def run_footage_ingest(
 ) -> FootageIngestSummary:
     """Poll Drive, build shots for each `downloaded` file, then move finished files to processed.
 
-    Each file is committed on its own: `downloaded` -> `tagged` once its shots are stored, then
-    `done` once it is moved in Drive and its scratch download deleted. A builder error is
-    recorded on the row and the job continues with the next file. Idempotent.
+    Every state change is committed on its own, per file and per step, so no write transaction
+    stays open during a download, build or move: `downloaded` -> `tagged` once its shots are
+    stored, then `done` once it is moved in Drive and its scratch download deleted. A builder
+    error is recorded on the row and the job continues with the next file. Idempotent.
     """
     max_attempts = ingest_settings.max_attempts
     poll = poll_footage(session, drive, store, drive_settings, max_attempts)
-    session.commit()
 
     built = shot_count = failed = 0
     downloaded = select(FootageFileRow).where(FootageFileRow.status == FootageStatus.DOWNLOADED)
@@ -81,7 +81,6 @@ def run_footage_ingest(
     completed, failed_moves = complete_tagged_footage(
         session, drive, processed_folder_id, max_attempts
     )
-    session.commit()
     return FootageIngestSummary(
         poll=poll, built=built, shots=shot_count, completed=completed, failed=failed + failed_moves
     )
