@@ -5,6 +5,7 @@ import typer
 
 from engine.config import Settings, load_settings
 from engine.db.session import create_db_engine, make_session_factory, session_scope
+from engine.handoff.expiry import supersede_expired
 from engine.notify.base import NotificationError
 from engine.notify.handoff import send_pending_handoff_notifications
 from engine.notify.models import Notification
@@ -35,21 +36,22 @@ def test() -> None:
 
 @app.command()
 def pending() -> None:
-    """Send hand-off notifications for ready renders not notified yet (held in quiet hours)."""
+    """Supersede expired renders, then send pending hand-off notifications (held in quiet hours)."""
     settings = load_settings()
     with httpx.Client(timeout=settings.notify.timeout_s) as client:
         notifier = _notifier_or_exit(settings, client)
         engine = create_db_engine(settings.db_url)
         try:
             with session_scope(make_session_factory(engine)) as session:
-                sent = send_pending_handoff_notifications(
-                    session, notifier, settings, datetime.now(UTC)
-                )
+                now = datetime.now(UTC)
+                superseded = supersede_expired(session, settings, now)
+                sent = send_pending_handoff_notifications(session, notifier, settings, now)
         except ValueError as error:
             typer.echo(str(error))
             raise typer.Exit(code=1) from None
         finally:
             engine.dispose()
+    typer.echo(f"superseded {superseded} expired render(s)")
     typer.echo(f"sent {sent} hand-off notification(s)")
 
 

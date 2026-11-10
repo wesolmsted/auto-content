@@ -1,4 +1,5 @@
 import shutil
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -9,6 +10,7 @@ from typer.testing import CliRunner
 
 from engine.cli import app
 from engine.config import load_settings
+from engine.db.enums import RenderStatus
 from engine.db.migrate import upgrade_to_head
 from engine.db.models import RenderRow
 from engine.db.session import create_db_engine, make_session_factory, session_scope
@@ -97,6 +99,37 @@ def test_notify_pending_sends_and_records_ready_renders(ntfy_env: None) -> None:
         ).scalar_one()
     engine.dispose()
     assert notified_at is not None
+
+
+@respx.mock
+def test_notify_pending_supersedes_expired_renders_before_sending(ntfy_env: None) -> None:
+    route = respx.post(TOPIC_URL).mock(return_value=httpx.Response(200))
+    settings = load_settings()
+    settings.db_path.parent.mkdir(parents=True)
+    upgrade_to_head(settings.db_url)
+    engine = create_db_engine(settings.db_url)
+    factory = make_session_factory(engine)
+    notified_long_ago = datetime.now(UTC) - timedelta(hours=settings.handoff.expire_hours + 1)
+    notified_recently = datetime.now(UTC) - timedelta(hours=1)
+    with session_scope(factory) as session:
+        expired_id = add_render(session, "Old Song", notified_at=notified_long_ago).id
+        recent_id = add_render(session, "Recent Song", notified_at=notified_recently).id
+        pending_id = add_render(session, "New Song").id
+
+    result = runner.invoke(app, ["notify", "pending"])
+
+    assert result.exit_code == 0, result.output
+    assert "superseded 1 expired render(s)" in result.output
+    assert "sent 1 hand-off notification(s)" in result.output
+    assert route.call_count == 1
+    with factory() as session:
+        rows = session.execute(select(RenderRow.id, RenderRow.status)).all()
+    engine.dispose()
+    assert dict(rows) == {
+        expired_id: RenderStatus.SUPERSEDED,
+        recent_id: RenderStatus.READY,
+        pending_id: RenderStatus.READY,
+    }
 
 
 def test_notify_pending_without_ntfy_config_exits_1(cli_env: Path) -> None:

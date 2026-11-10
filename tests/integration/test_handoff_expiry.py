@@ -18,7 +18,12 @@ RECIPE = BASE_SETTINGS.recipes.fixed[0]
 NOW = datetime(2026, 6, 10, 12, 0, tzinfo=UTC)
 
 
-def add_render(session: Session, status: RenderStatus, created_at: datetime) -> int:
+def add_render(
+    session: Session,
+    status: RenderStatus,
+    notified_at: datetime | None,
+    created_at: datetime = NOW - timedelta(days=30),
+) -> int:
     if session.get(RecipeRow, RECIPE.id) is None:
         session.add(RecipeRow(id=RECIPE.id, params_json=RECIPE.canonical_params()))
     song = SongRow(title="Song", audio_path="song.wav")
@@ -33,6 +38,7 @@ def add_render(session: Session, status: RenderStatus, created_at: datetime) -> 
         timeline_json={},
         status=status,
         created_at=created_at,
+        notified_at=notified_at,
     )
     session.add(render)
     session.flush()
@@ -44,10 +50,14 @@ def statuses(session: Session) -> dict[int, RenderStatus]:
     return {render_id: status for render_id, status in rows}
 
 
-def test_supersedes_only_ready_renders_older_than_expire_hours(db_session: Session) -> None:
+def test_supersedes_only_ready_renders_notified_more_than_expire_hours_ago(
+    db_session: Session,
+) -> None:
     expired = add_render(db_session, RenderStatus.READY, NOW - timedelta(hours=72, seconds=1))
-    at_limit = add_render(db_session, RenderStatus.READY, NOW - timedelta(hours=72))
-    fresh = add_render(db_session, RenderStatus.READY, NOW - timedelta(hours=1))
+    at_cutoff = add_render(db_session, RenderStatus.READY, NOW - timedelta(hours=72))
+    just_before_cutoff = add_render(
+        db_session, RenderStatus.READY, NOW - timedelta(hours=71, minutes=59, seconds=59)
+    )
     old_approved = add_render(db_session, RenderStatus.APPROVED, NOW - timedelta(days=10))
     old_rejected = add_render(db_session, RenderStatus.REJECTED, NOW - timedelta(days=10))
     old_rendering = add_render(db_session, RenderStatus.RENDERING, NOW - timedelta(days=10))
@@ -57,12 +67,33 @@ def test_supersedes_only_ready_renders_older_than_expire_hours(db_session: Sessi
     assert superseded == 1
     assert statuses(db_session) == {
         expired: RenderStatus.SUPERSEDED,
-        at_limit: RenderStatus.READY,
-        fresh: RenderStatus.READY,
+        at_cutoff: RenderStatus.READY,
+        just_before_cutoff: RenderStatus.READY,
         old_approved: RenderStatus.APPROVED,
         old_rejected: RenderStatus.REJECTED,
         old_rendering: RenderStatus.RENDERING,
     }
+
+
+def test_counts_from_notified_at_not_created_at(db_session: Session) -> None:
+    held_in_quiet_hours = add_render(
+        db_session,
+        RenderStatus.READY,
+        notified_at=NOW - timedelta(hours=1),
+        created_at=NOW - timedelta(hours=100),
+    )
+
+    assert supersede_expired(db_session, SETTINGS, NOW) == 0
+    assert statuses(db_session) == {held_in_quiet_hours: RenderStatus.READY}
+
+
+def test_a_ready_render_never_notified_never_expires(db_session: Session) -> None:
+    unnotified = add_render(
+        db_session, RenderStatus.READY, notified_at=None, created_at=NOW - timedelta(days=365)
+    )
+
+    assert supersede_expired(db_session, SETTINGS, NOW) == 0
+    assert statuses(db_session) == {unnotified: RenderStatus.READY}
 
 
 def test_uses_the_configured_expiry(db_session: Session) -> None:
