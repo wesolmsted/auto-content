@@ -8,6 +8,7 @@ import pytest
 from engine.config import RecipeSettings, load_settings
 from engine.db.enums import Orientation
 from engine.ingest.models import Shot, ShotTags
+from engine.recipes.assembly import assemble
 from engine.recipes.models import Recipe
 from engine.recipes.selection import select_shots
 from engine.recipes.slots import NotEnoughShotsError
@@ -249,3 +250,32 @@ def test_raises_when_the_library_cannot_fill_the_timeline(settings: RecipeSettin
 def test_raises_on_an_empty_library(settings: RecipeSettings) -> None:
     with pytest.raises(NotEnoughShotsError):
         select([], settings)
+
+
+def test_one_long_shot_uses_the_longest_shots_longest_first(settings: RecipeSettings) -> None:
+    library = [
+        make_shot(1, duration_s=2.0),
+        make_shot(2, duration_s=4.2),
+        make_shot(3, duration_s=3.1),
+        make_shot(4, duration_s=1.0),
+    ]
+    chosen = select(library, settings, cut_rate="one_long_shot", length_s=7)
+    assert ids(chosen) == [2, 3]
+
+
+def test_one_long_shot_fills_20_s_from_8_s_shots(settings: RecipeSettings) -> None:
+    library = [make_shot(shot_id, duration_s=8.0) for shot_id in range(1, 6)]
+    recipe = make_recipe(cut_rate="one_long_shot", length_s=20)
+    beats = tuple(index * 0.5 for index in range(60))
+    grid = BeatGrid(bpm=120.0, beats=beats, downbeats=beats[::4], duration_s=30.0)
+    chosen = select_shots(recipe, library, grid, random.Random(0), settings, NOW)
+    timeline = assemble(recipe, chosen, grid)
+    assert timeline.duration_s == 20.0
+    assert [segment.output_start_s for segment in timeline.segments] == [0.0, 8.0, 16.0]
+    assert len(set(timeline.shot_ids)) == 3
+
+
+def test_one_long_shot_raises_when_the_shots_run_out(settings: RecipeSettings) -> None:
+    library = [make_shot(1, duration_s=3.0), make_shot(2, duration_s=3.0)]
+    with pytest.raises(NotEnoughShotsError):
+        select(library, settings, cut_rate="one_long_shot", length_s=7)

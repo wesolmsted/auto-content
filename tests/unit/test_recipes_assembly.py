@@ -173,7 +173,48 @@ def test_raises_when_the_shots_cannot_fill_every_slot() -> None:
 
 def test_raises_when_no_shot_is_long_enough() -> None:
     with pytest.raises(NotEnoughShotsError):
-        assemble(make_recipe(cut_rate="one_long_shot"), make_shots(5, duration_s=6.0), make_grid())
+        assemble(make_recipe(cut_rate="every_2_beats"), make_shots(20, duration_s=0.5), make_grid())
+
+
+def test_one_long_shot_raises_when_no_shot_reaches_a_beat() -> None:
+    with pytest.raises(NotEnoughShotsError):
+        assemble(make_recipe(cut_rate="one_long_shot"), make_shots(5, duration_s=0.3), make_grid())
+
+
+def shots_of(*durations: float) -> list[Shot]:
+    return [make_shot(index, duration) for index, duration in enumerate(durations, start=1)]
+
+
+def spans(timeline: Timeline) -> list[tuple[int, float, float]]:
+    return [(s.shot_id, s.output_start_s, s.output_end_s) for s in timeline.segments]
+
+
+def test_one_long_shot_cuts_on_the_last_beat_each_shot_covers() -> None:
+    timeline = assemble(
+        make_recipe(cut_rate="one_long_shot"), shots_of(3.2, 2.7, 5.0), make_grid(drop_s=None)
+    )
+    assert spans(timeline) == [(1, 0.0, 3.0), (2, 3.0, 5.5), (3, 5.5, 7.0)]
+
+
+def test_one_long_shot_keeps_the_hard_cut_on_the_drop() -> None:
+    timeline = assemble(
+        make_recipe(cut_rate="one_long_shot"), shots_of(3.2, 2.7, 5.0), make_grid(drop_s=5.0)
+    )
+    assert spans(timeline) == [(1, 0.0, 3.0), (2, 3.0, 5.0), (3, 5.0, 7.0)]
+
+
+def test_one_long_shot_never_cuts_closer_than_the_minimum_segment_to_the_end() -> None:
+    timeline = assemble(
+        make_recipe(cut_rate="one_long_shot"), shots_of(6.95, 5.0), make_grid(drop_s=None)
+    )
+    assert spans(timeline) == [(1, 0.0, 6.5), (2, 6.5, 7.0)]
+
+
+def test_one_long_shot_skips_a_shot_that_reaches_no_beat() -> None:
+    timeline = assemble(
+        make_recipe(cut_rate="one_long_shot"), shots_of(0.3, 4.0, 5.0), make_grid(drop_s=None)
+    )
+    assert spans(timeline) == [(2, 0.0, 4.0), (3, 4.0, 7.0)]
 
 
 def test_unstored_shots_are_rejected() -> None:
