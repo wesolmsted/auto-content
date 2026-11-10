@@ -365,3 +365,37 @@ def test_ties_between_recipes_are_broken_at_random(
 ) -> None:
     first_picks = {plan(db_session, settings, n=1, seed=seed)[0].recipe_id for seed in range(30)}
     assert first_picks == {recipe.id for recipe in fixed}
+
+
+def only(settings: Settings, recipe: Recipe) -> Settings:
+    return settings.model_copy(
+        update={"recipes": settings.recipes.model_copy(update={"fixed": (recipe,)})}
+    )
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_prefers_a_snippet_whose_drop_falls_inside_the_video(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    song_id = db_session.scalars(select(SongRow.id)).one()
+    early_drop = SnippetRow(
+        song_id=song_id, snippet_type=SnippetType.DROP, start_s=20.0, end_s=42.0, drop_s=23.0
+    )
+    db_session.add(early_drop)
+    db_session.flush()
+    # The seeded drop snippet's drop is 8 s in: past the end of the 7 s recipe's video.
+    [render_plan] = plan(db_session, only(settings, fixed[1]), n=1, seed=seed)
+    assert render_plan.snippet_id == early_drop.id
+    assert 3.0 in [segment.output_start_s for segment in render_plan.timeline.segments]
+
+
+def test_falls_back_to_a_snippet_whose_drop_is_past_the_video_end(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    [render_plan] = plan(db_session, only(settings, fixed[1]), n=1)
+    assert render_plan.snippet_id == seeded["drop"]
+    assert render_plan.timeline.duration_s == 7.0

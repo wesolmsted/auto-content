@@ -18,7 +18,7 @@ from engine.ingest.shot_rows import shot_from_row
 from engine.recipes.assembly import assemble
 from engine.recipes.models import Recipe, RenderPlan
 from engine.recipes.selection import select_shots
-from engine.recipes.slots import NotEnoughShotsError
+from engine.recipes.slots import NotEnoughShotsError, target_duration
 from engine.snippets.analysis import beat_grid_for_snippet
 from engine.snippets.models import BeatGrid, SongAnalysis
 
@@ -46,11 +46,12 @@ def plan_batch(
     """Up to `n` render plans pairing a fixed recipe with an active snippet of its type.
 
     Each plan goes to the recipe with the fewest renders in the last 7 days (failed renders
-    aside, this batch included; ties broken by `rng`), on a random snippet of its type. When
-    no snippet of that recipe can be filled, the next recipe in that order is tried. A recipe
-    already rendered `recipes.max_repeats_per_week` times in that window is not picked. Shots
-    planned earlier in the batch count as used `now`, so the cooldown keeps them out of later
-    plans. The batch is shorter when no recipe can be filled. Every plan targets `ig_trial`;
+    aside, this batch included; ties broken by `rng`), on a random snippet of its type,
+    preferring snippets whose drop falls inside the recipe's video length. When no snippet of
+    that recipe can be filled, the next recipe in that order is tried. A recipe already
+    rendered `recipes.max_repeats_per_week` times in that window is not picked. Shots planned
+    earlier in the batch count as used `now`, so the cooldown keeps them out of later plans.
+    The batch is shorter when no recipe can be filled. Every plan targets `ig_trial`;
     the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
     `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
     Captions are left empty: the render step fills them from the config templates.
@@ -120,11 +121,17 @@ def _first_fillable(
             snippet for snippet in snippets if snippet.snippet_type is recipe.snippet_type
         ]
         rng.shuffle(candidates)
+        candidates.sort(key=lambda snippet: not _drop_in_video(recipe, snippet.beat_grid))
         for snippet in candidates:
             shots = _try_select(recipe, snippet, library, rng, settings, now)
             if shots is not None:
                 return recipe, snippet, shots
     return None
+
+
+def _drop_in_video(recipe: Recipe, beat_grid: BeatGrid) -> bool:
+    drop_s = beat_grid.drop_s
+    return drop_s is not None and drop_s <= target_duration(recipe.length_s, beat_grid)
 
 
 def _try_select(
