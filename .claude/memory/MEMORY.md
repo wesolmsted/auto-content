@@ -30,3 +30,6 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Project status](project-status.md): where work stopped, open questions for the owner, owner action items, next tasks. Read first when resuming
 - [Task 09: measure](task-09-measure.md): read-only Meta/TikTok readers, match_posts, run_measure, ace measure due / posts link / auth meta|tiktok, unverified API details, owner's developer-app setup
 - [Task 11: render batch](task-11-render-batch.md): run_render_batch flow, ace render batch/one, shot_rows now in engine/ingest/shot_rows.py, beat-grid consolidation, e2e test
+- [Task 13: ingest lock](task-13-ingest-lock.md): ingest commits per file and step so slow downloads/moves don't lock SQLite; how the lock test reproduces it
+- [Task 14: expiry](task-14-expiry.md): expiry from notified_at, unnotified never expire, ace notify pending supersedes before sending
+- [Task 15: snippet start](task-15-snippet-start.md): snap_start_to_downbeat, snippets add stores the snapped start; old snippets must be re-added

@@ -13,7 +13,7 @@ Slice 2 built the Drive side of `ace ingest footage` and the job that drives sli
   - `GoogleDriveClient(credentials, settings: DriveSettings, *, service=None)`. `service` is an already-built Drive v3 resource, for tests.
   - `DRIVE_SCOPES` (`drive`), `token_path(secrets_dir)` (`google_token.json`), `run_oauth_flow(client_json)`, `save_credentials(creds, path)` (0600), `load_credentials(path, request=None)` (refreshes an expired token and re-saves it; raises `GoogleAuthError` "run `ace auth google`").
 - `engine/ingest/poller.py`:
-  - `poll_footage(...)` keeps the skeleton signature. The caller commits.
+  - `poll_footage(...)` keeps the skeleton signature. It commits after each state change (task 13), so no write transaction spans a download or move.
   - Helpers the job reuses: `footage_folders(settings)` (raises ValueError if an id is unset), `complete_tagged_footage(session, drive, processed_id, max_attempts)`, `advance(row, status)`, `record_failure(row, error, max_attempts) -> bool`.
 - `engine/ingest/job.py`:
   - `run_footage_ingest(session, drive, store, tagger, drive_settings, ingest_settings, build=build_shots) -> FootageIngestSummary(poll, built, shots, completed, failed)`;

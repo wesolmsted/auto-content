@@ -17,7 +17,7 @@ Slice 8 built the hand-off web page (`engine/handoff/`) and `ace serve`.
   - `reject_render(session, render, reason, note, now)`.
   - `link_post(session, render, platform, url)`.
 - `engine/handoff/links.py`: `parse_post_url(platform, url) -> PostLink(external_id, permalink)`. It is pure and raises `PostUrlError(ValueError)`. The measure agent's `ace posts link` can reuse it.
-- `engine/handoff/expiry.py`: `supersede_expired(session, settings, now) -> int`. It flushes but doesn't commit. **Nothing calls it yet**; the main agent has to wire it into a scheduled job.
+- `engine/handoff/expiry.py`: `supersede_expired(session, settings, now) -> int`. It flushes but doesn't commit. `ace notify pending` calls it before sending (task 14); expiry counts from `notified_at`.
 - `engine/handoff/cli.py`: `ace serve [--host --port]`. Defaults come from `handoff.host`/`handoff.port` (127.0.0.1:8000). It exits 1 when `HANDOFF_TOKEN` is unset or empty. It runs `uvicorn.run(app, host, port)`.
 
 ## Routes
@@ -83,7 +83,6 @@ The URL is stripped first. The scheme must be http/https; a URL with no scheme i
 ## Deviations from DESIGN.md
 - The link-post route is `POST /handoff/{id}/link` with a `platform` form field. DESIGN doesn't name it.
 - The IG `external_id` from a manual link is the **reel shortcode**, while the Graph API `/media` id is numeric. The measure slice must handle that: match manual IG posts by `permalink`, or resolve the shortcode, before `fetch_metrics`. Manual links also have `posted_at` NULL, so the 24 h/72 h checkpoints need `posted_at` filled in from `recent_videos`.
-- Expiry counts from `renders.created_at`, not `notified_at`. With notifications held until 16:00, a render made at 06:00 gets about 62 h after the notification arrives.
 - `/static` sits behind the login too, which is stricter than DESIGN asks.
 
 ## Gotchas

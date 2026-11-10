@@ -233,7 +233,7 @@ stateDiagram-v2
     rendering --> ready: file validated + notification sent
     ready --> approved: owner downloads video
     ready --> rejected: owner taps Reject
-    ready --> superseded: not downloaded within handoff.expire_hours
+    ready --> superseded: not downloaded within handoff.expire_hours of notified_at
     approved --> [*]: posts rows created (awaiting_post)
 ```
 
@@ -305,6 +305,7 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
   - The beat grid assumes a constant tempo. librosa's beats are refined by a line fit and extended over the whole song; songs with tempo changes would need madmom.
   - Songs are cached by resolved file path.
   - `snippets.drop_s` is stored as absolute song time, like `start_s`/`end_s`.
+  - `snippets add` snaps `start_s` to the nearest downbeat before `end_s` (ties go earlier), so videos start on the bar; `end_s` is stored as typed.
   - The drop is auto-detected for every snippet type unless `--drop` is given: the largest RMS rise of at least 3 dB, snapped to a downbeat.
 
 ### 7.3 Recipes and assembly (Phase 1)
@@ -351,7 +352,7 @@ Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and 
   - after approval, a **Link post** field to paste the post URL if auto-matching misses it (§7.6).
 - **Download = approval.** *Save video* calls `/handoff/{id}/download`. The server records `downloaded_at`, increments `download_count`, moves the render `ready → approved` (only on the first download) and creates one `posts` row per target in `awaiting_post`, all in one transaction. Then it returns the file. On phones that support the Web Share API with files (iOS Safari), the page fetches that endpoint and opens the share sheet, so *Save Video* puts it straight into Photos. Otherwise it's a plain `Content-Disposition: attachment` link. Repeat downloads are allowed and don't create duplicate posts.
 - A rejected or superseded render can't be downloaded (the button is gone; the endpoint returns 409).
-- Renders not downloaded within `handoff.expire_hours` (default 72) become `superseded`. Superseded counts as a weak negative in the taste prior (weight in config, default 0.25 of a reject).
+- Renders not downloaded within `handoff.expire_hours` (default 72) of their notification (`notified_at`) become `superseded`; a render not yet notified never expires. `ace notify pending` runs expiry before sending. Superseded counts as a weak negative in the taste prior (weight in config, default 0.25 of a reject).
 - Templates are plain Jinja + minimal CSS + a few lines of vanilla JS for share/copy; no JS framework.
 
 ### 7.6 Post matching and metrics (Phase 1)
@@ -525,6 +526,8 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | 2026-11-08 | — | Binary reward vs rolling trial baseline for the bandit | Metrics are noisy and differently scaled; a Beta-Bernoulli per variable is simple and robust. Revisit with more data. |
 | 2026-11-08 | — | Render from local proxies, not Drive originals | Renders become fast and independent of Drive availability. |
 | 2026-11-08 | — | Match manual posts by duration + caption similarity + time, with manual link fallback | No ID links a hand-posted video to its render; these signals are available from both read APIs. Frame-fingerprint matching was considered and deferred until the match rate shows it's needed. |
+| 2026-11-09 | — | Hand-off expiry counts from `notified_at`; unnotified renders never expire | Notifications are held for quiet hours, so counting from `created_at` shortened the owner's real window by up to ~10 h. |
+| 2026-11-09 | — | Snippet start snaps to the nearest downbeat | First real run: every video started mid-beat, with the first cut 0.3–0.4 s in. |
 | 2026-11-09 | — | `footage_orientation` (portrait · landscape) is a recipe variable; a render never mixes orientations | First real run: landscape music-video shots center-cropped to 9:16 lose content and look different from portrait phone footage. Making it a variable keeps renders consistent and lets the learning loop measure whether cropped landscape footage performs. |
 | 2026-11-08 | — | TikTok watch time from a weekly TikTok Studio export, not browser scraping | Scraping logged-in pages breaks both platforms' terms and risks the account; the export is first-party data for about 2 minutes of owner effort a week. |
 
