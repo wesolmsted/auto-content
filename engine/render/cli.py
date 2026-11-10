@@ -74,7 +74,10 @@ def one(
     recipe: Annotated[str, typer.Option(help="Recipe id.")],
     snippet: Annotated[int, typer.Option(help="Snippet id.")],
 ) -> None:
-    """Render a single recipe on a single snippet (dev loop)."""
+    """Render a single recipe on a single snippet (dev loop).
+
+    Ignores `recipes.max_repeats_per_week` and `recipes.shot_cooldown_days`.
+    """
     settings = _only_recipe(load_settings(), recipe)
     engine = _open_database(settings)
     try:
@@ -88,6 +91,7 @@ def one(
                 datetime.now(UTC),
                 1,
                 snippet_id=snippet,
+                ignore_limits=True,
             )
             if summary.planned == 0:
                 typer.echo("nothing to render: see the log for why the pair was skipped")

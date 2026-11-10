@@ -42,6 +42,7 @@ def plan_batch(
     n: int,
     *,
     snippet_id: int | None = None,
+    ignore_limits: bool = False,
 ) -> list[RenderPlan]:
     """Up to `n` render plans pairing a fixed recipe with an active snippet of its type.
 
@@ -55,7 +56,8 @@ def plan_batch(
     the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
     `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
     Captions are left empty: the render step fills them from the config templates.
-    With `snippet_id`, only that snippet is planned.
+    With `snippet_id`, only that snippet is planned. With `ignore_limits` (the `ace render one`
+    dev loop), neither the weekly cap nor the shot cooldown applies.
     """
     snippets = _active_snippets(session, snippet_id)
     library = _tagged_shots(session)
@@ -69,10 +71,16 @@ def plan_batch(
         recipes = [
             recipe
             for recipe in settings.recipes.fixed
-            if repeats[recipe.id] < settings.recipes.max_repeats_per_week
+            if ignore_limits or repeats[recipe.id] < settings.recipes.max_repeats_per_week
         ]
         planned = _first_fillable(
-            _least_rendered_first(recipes, repeats, rng), snippets, library, rng, settings, now
+            _least_rendered_first(recipes, repeats, rng),
+            snippets,
+            library,
+            rng,
+            settings,
+            now,
+            ignore_cooldown=ignore_limits,
         )
         if planned is None:
             break
@@ -114,6 +122,8 @@ def _first_fillable(
     rng: random.Random,
     settings: Settings,
     now: datetime,
+    *,
+    ignore_cooldown: bool,
 ) -> tuple[Recipe, SnippetChoice, list[Shot]] | None:
     """The first recipe, in the given order, that one of its snippets and the library can fill."""
     for recipe in recipes:
@@ -123,7 +133,7 @@ def _first_fillable(
         rng.shuffle(candidates)
         candidates.sort(key=lambda snippet: not _drop_in_video(recipe, snippet.beat_grid))
         for snippet in candidates:
-            shots = _try_select(recipe, snippet, library, rng, settings, now)
+            shots = _try_select(recipe, snippet, library, rng, settings, now, ignore_cooldown)
             if shots is not None:
                 return recipe, snippet, shots
     return None
@@ -141,9 +151,18 @@ def _try_select(
     rng: random.Random,
     settings: Settings,
     now: datetime,
+    ignore_cooldown: bool,
 ) -> list[Shot] | None:
     try:
-        return select_shots(recipe, library, snippet.beat_grid, rng, settings.recipes, now)
+        return select_shots(
+            recipe,
+            library,
+            snippet.beat_grid,
+            rng,
+            settings.recipes,
+            now,
+            ignore_cooldown=ignore_cooldown,
+        )
     except NotEnoughShotsError as error:
         logger.warning(
             "skipping recipe for snippet: %s",

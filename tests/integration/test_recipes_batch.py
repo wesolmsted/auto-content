@@ -399,3 +399,19 @@ def test_falls_back_to_a_snippet_whose_drop_is_past_the_video_end(
     [render_plan] = plan(db_session, only(settings, fixed[1]), n=1)
     assert render_plan.snippet_id == seeded["drop"]
     assert render_plan.timeline.duration_s == 7.0
+
+
+def test_ignore_limits_plans_past_the_weekly_cap_and_the_shot_cooldown(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    for day in range(settings.recipes.max_repeats_per_week):
+        add_render(db_session, fixed[0], seeded["drop"], NOW - timedelta(days=day + 1), [])
+    for row in db_session.scalars(select(ShotRow)):
+        row.last_used_at = NOW - timedelta(hours=1)
+    db_session.flush()
+    first_only = only(settings, fixed[0])
+
+    assert plan(db_session, first_only, n=1) == []
+    plans = plan_batch(db_session, first_only, random.Random(1), NOW, 2, ignore_limits=True)
+    assert [render_plan.recipe_id for render_plan in plans] == [fixed[0].id] * 2
+    assert len(plans[0].timeline.shot_ids) == 12

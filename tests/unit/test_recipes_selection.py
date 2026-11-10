@@ -279,3 +279,19 @@ def test_one_long_shot_raises_when_the_shots_run_out(settings: RecipeSettings) -
     library = [make_shot(1, duration_s=3.0), make_shot(2, duration_s=3.0)]
     with pytest.raises(NotEnoughShotsError):
         select(library, settings, cut_rate="one_long_shot", length_s=7)
+
+
+def test_ignore_cooldown_lets_recently_used_shots_be_chosen(settings: RecipeSettings) -> None:
+    yesterday = NOW - timedelta(days=1)
+    library = [
+        make_shot(1, motion=0.9, last_used_at=yesterday),
+        make_shot(2, motion=0.8, last_used_at=yesterday),
+        make_shot(3, motion=0.1),
+        make_shot(4, motion=0.2),
+    ]
+    recipe = make_recipe()
+    chosen = select_shots(
+        recipe, library, make_grid(), random.Random(0), settings, NOW, ignore_cooldown=True
+    )
+    assert chosen[0].id == 1
+    assert ids(select(library, settings))[0] == 4

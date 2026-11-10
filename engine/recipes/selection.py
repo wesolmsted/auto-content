@@ -22,19 +22,23 @@ def select_shots(
     rng: random.Random,
     settings: RecipeSettings,
     now: datetime,
+    *,
+    ignore_cooldown: bool = False,
 ) -> list[Shot]:
     """Pure: one distinct shot per timeline slot, in timeline order (DESIGN.md §7.3).
 
     Filters by `recipe.footage_orientation` (a render never mixes orientations),
     `recipe.footage_category` (any category for `mixed`) and `settings.quality_floor`, and
-    excludes shots used within `settings.shot_cooldown_days` of `now`. Slot 0 gets the best
-    shot for `recipe.opening_shot` that is long enough for it; the other slots, longest first,
-    each take a random remaining shot that is long enough. `one_long_shot` ignores
+    excludes shots used within `settings.shot_cooldown_days` of `now` (unless
+    `ignore_cooldown`). Slot 0 gets the best shot for `recipe.opening_shot` that is long
+    enough for it; the other slots, longest first, each take a random remaining shot that is
+    long enough. `one_long_shot` ignores
     `opening_shot` and takes the longest shots, longest first (see `fit_long_shots`). Raises
     `NotEnoughShotsError` when the library can't fill every slot. Deterministic for a given
     `rng` state.
     """
-    pool = [shot for shot in library if _is_eligible(shot, recipe, settings, now)]
+    cooldown = timedelta(0 if ignore_cooldown else settings.shot_cooldown_days)
+    pool = [shot for shot in library if _is_eligible(shot, recipe, settings, now, cooldown)]
     eligible_count = len(pool)
     rng.shuffle(pool)
     if recipe.cut_rate is CutRate.ONE_LONG_SHOT:
@@ -65,7 +69,9 @@ def select_shots(
     return [chosen[index] for index in range(len(slots))]
 
 
-def _is_eligible(shot: Shot, recipe: Recipe, settings: RecipeSettings, now: datetime) -> bool:
+def _is_eligible(
+    shot: Shot, recipe: Recipe, settings: RecipeSettings, now: datetime, cooldown: timedelta
+) -> bool:
     if shot.orientation != recipe.footage_orientation:
         return False
     if (
@@ -75,7 +81,6 @@ def _is_eligible(shot: Shot, recipe: Recipe, settings: RecipeSettings, now: date
         return False
     if shot.quality_score < settings.quality_floor:
         return False
-    cooldown = timedelta(days=settings.shot_cooldown_days)
     return shot.last_used_at is None or now - shot.last_used_at >= cooldown
 
 
