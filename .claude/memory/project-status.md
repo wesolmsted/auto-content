@@ -9,7 +9,7 @@ type: project
 **Why:** lets the next session resume without re-deriving context.
 **How to apply:** read this first. Ask the owner the open questions before changing the behavior they cover, then run the next tasks with the parallel agent workflow in CLAUDE.md.
 
-## Open questions for the owner (recommendation in bold; not yet answered)
+## Owner questions (answered 2026-11-09: recommendations in bold accepted for 1–12; 13 stays open)
 1. **ntfy server:** default `NTFY_SERVER` to `https://ntfy.sh`? **Yes.**
 2. **Notification title:** keep "Hand-off ready: <song> · <cut rate>, <look>"? **Keep for now.**
 3. **Problem files:** a file with zero usable shots = failure, and scratch files of failed downloads are kept. **OK.**
@@ -25,10 +25,7 @@ type: project
 13. **Caption matching:** with weights caption 0.7 / time 0.3 and `min_score` 0.3, a post whose caption shares no words with the provided one rarely auto-matches. Keep it, relying on manual link as the fallback, or lower `min_score`? Undecided; tune with real data.
 
 ## Owner action items
-- **Now:**
-  - Open `/hooks` or restart Claude Code, so the repo auto-approve hook loads.
-  - `brew install ffmpeg-full`, so on-screen text renders locally; set `tools.ffmpeg` if needed.
-  - Check GitHub Actions/Docker, or install `gh` so Claude can.
+- **Now:** done 2026-11-09 (hook reloaded, ffmpeg-full installed so drawtext works and the suite runs 561 tests with no skips, GitHub checked).
 - **Before the first real run:**
   - a Google OAuth desktop client (`GOOGLE_OAUTH_CLIENT_JSON`), then `ace auth google`, and set the Drive folder ids;
   - `ANTHROPIC_API_KEY`;
@@ -38,7 +35,7 @@ type: project
 - **Later:** real songs and footage for tuning; one sample TikTok Studio export before Phase 2.
 
 ## Next tasks (not started)
-1. **Apply the owner's answers** to questions 1–12.
+1. **Apply the owner's answers** to questions 1–12 (all recommendations accepted).
 2. **Shared-file follow-ups:**
    - bump `measure.meta_graph_url` (currently v23.0) after checking the real account;
    - optionally add `error`/`attempts` to `posts`;
