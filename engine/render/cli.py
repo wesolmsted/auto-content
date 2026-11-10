@@ -31,7 +31,10 @@ def batch(
     snippet: Annotated[int | None, typer.Option(help="Only this snippet id.")] = None,
     dry_run: Annotated[bool, typer.Option(help="Print timelines; render nothing.")] = False,
 ) -> None:
-    """Render the day's batch and send a hand-off notification per finished render."""
+    """Render the day's batch and send a hand-off notification per finished render.
+
+    Exits 1 if any render in the batch failed.
+    """
     settings = _only_recipe(load_settings(), recipe)
     count = settings.cadence.renders_per_day if n is None else n
     rng = random.Random()
@@ -62,6 +65,8 @@ def batch(
         f"planned={summary.planned} ready={summary.ready} "
         f"failed={summary.failed} notified={summary.notified}"
     )
+    if summary.failed:
+        raise typer.Exit(code=1)
 
 
 @app.command()

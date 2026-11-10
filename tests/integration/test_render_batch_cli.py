@@ -212,3 +212,16 @@ def test_render_one_exits_1_when_nothing_can_be_planned(snippets: dict[str, int]
     assert result.exit_code == 1
     assert "nothing to render" in result.output
     assert count(RenderRow) == 0
+
+
+@pytest.mark.usefixtures("snippets")
+def test_a_failed_render_makes_the_batch_exit_1_after_the_summary(tmp_path: Path) -> None:
+    with session() as db:
+        for row in db.scalars(select(ShotRow)):
+            row.proxy_path = str(tmp_path / "missing.mp4")
+        db.commit()
+
+    result = runner.invoke(app, ["render", "batch", "--n", "1"])
+
+    assert result.exit_code == 1, result.output
+    assert "planned=1 ready=0 failed=1 notified=0" in result.output
