@@ -23,12 +23,12 @@ Task 11 wired planning, rendering, shot usage and notifications into `ace render
   - `--recipe` narrows `settings.recipes.fixed` to that recipe. An id that isn't in it exits 1 with `unknown recipe <id>`.
   - `--snippet` is passed to `plan_batch(snippet_id=...)`.
   - `--dry-run` prints `plan k: recipe=… snippet=… targets=ig_trial,tiktok duration=12.00s`, then a `  cuts:` line and a `  shots:` line. It writes nothing and sends nothing.
-  - Otherwise it prints `planned= ready= failed= notified=` and exits 0, even when some renders failed. Failures are on the rows.
+  - Otherwise it prints `planned= ready= failed= notified=` and exits 1 if any render failed (task 12). Failures are on the rows.
   - The notifier is built with `ntfy_notifier_from_settings`. If ntfy isn't configured, the batch still renders: it logs a warning and prints `notifications skipped: ntfy is not configured: set …`.
   - A `ValueError` exits 1 with its message. The main case is ntfy configured but `HANDOFF_BASE_URL` unset during the posting window: the renders are already committed, and only the notifications fail.
 - `ace render one --recipe ID --snippet ID` runs `run_render_batch` with n=1, that recipe and snippet, and no notifier.
   - It prints `render <id> ready: <path>`, or exits 1 with the render's error.
-  - It exits 1 with `nothing to render` when the pair can't be planned: the snippet type doesn't match, the recipe is at its weekly cap, or there aren't enough eligible shots.
+  - It exits 1 with `nothing to render` when the pair can't be planned: the snippet type doesn't match, or there aren't enough eligible shots. It ignores the weekly cap and shot cooldown (task 12).
 - Both use an unseeded `random.Random()`, so a dry run shows a sample batch, not the exact one a later real run will make.
 
 ## Moved code
@@ -53,6 +53,6 @@ Task 11 wired planning, rendering, shot usage and notifications into `ace render
 ## Deviations / gotchas
 - `plan_batch` gained a keyword-only `snippet_id` filter. `--snippet` and `ace render one` need it, and there was no other way to make it work without duplicating the planner.
 - The e2e test uses its own recipe (downbeats, 7 s, warm, so 4 slots of 2 s or less). The 3 fixed recipes need 10–14 distinct shots each, and the portrait fixture gives only 4 shots per build.
-- `ace render one` goes through `plan_batch`, so the weekly repeat cap, shot cooldown and TikTok targeting all apply. In the dev loop, a recipe stops planning after 3 renders a week. Lower `recipes.max_repeats_per_week` / `shot_cooldown_days` in `config/local.toml` while iterating.
+- `ace render one` goes through `plan_batch` with `ignore_limits=True` (task 12): TikTok targeting applies, the weekly cap and shot cooldown don't.
 - Rendering needs `render.luts_dir` to resolve. The default is relative (`config/luts`), so run from the repo root or set an absolute path. Tests set it with `ACE_RENDER__LUTS_DIR`.
 - No fixed recipe uses text, so the local Homebrew ffmpeg (which has no `drawtext`) renders the whole batch.

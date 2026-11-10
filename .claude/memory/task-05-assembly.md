@@ -15,7 +15,7 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
   - `every_beat`: all beats.
   - `every_2_beats`: `beats[::2]` (beat indexes 0, 2, 4, …, counting from the grid's first beat).
   - `downbeats`: the downbeats.
-  - `one_long_shot`: no grid cuts.
+  - `one_long_shot`: no grid cuts; task 12 chains the longest shots with `slots.fit_long_shots`, cutting on the last covered beat.
 - Only cuts within `[MIN_SEGMENT_S, duration - MIN_SEGMENT_S]` count (`MIN_SEGMENT_S = 0.1`).
 - Drop cut: when `hard_cut_on_drop` and `drop_s` falls inside that range, `drop_s` is added and any grid cut within 0.1 s of it is removed. A drop past the snapped end gives no cut. That's common: the default 7 s recipe has no drop cut when the drop sits 8 s into the snippet.
 - `NotEnoughShotsError(ValueError)`: the error both functions raise when shots run out.
@@ -50,8 +50,8 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
   - active snippets (only `snippet_id` when given, added by task 11) whose song has a `bpm` and `duration_s`. The grid comes from slice 4's `beat_grid_for_snippet`; a stored drop outside the window is passed as None, so it plans with no drop;
   - shots with `proxy_path`, `category`, `motion_score` and `quality_score` set, converted by `engine/ingest/shot_rows.py: shot_from_row`, the lossless inverse of `shot_to_row` in the same module: tags come from `tags_json`, the full `ShotTags` dump. It's round-trip tested in `tests/integration/test_shot_rows_roundtrip.py`.
 - Each plan:
-  - draws the shuffled (recipe, snippet with matching `snippet_type`) pairs whose recipe is under `max_repeats_per_week`. That counts non-failed renders with `created_at > now - 7 d`, plus this batch.
-  - tries pairs until `select_shots` succeeds. A failing pair is logged and skipped. When no pair works, the batch stops early (and may be empty).
+  - picks the recipe with the fewest non-failed renders in the last 7 days (plus this batch) among those under `max_repeats_per_week`, ties broken by `rng`; then tries its snippets, drop-inside-video first (task 12).
+  - tries recipes in that order until `select_shots` succeeds. A failing pair is logged and skipped. When no pair works, the batch stops early (and may be empty).
   - marks the shots it used with `last_used_at = now` in memory, so the cooldown keeps them out of later plans.
 - Targets: always `ig_trial`. The first `tiktok_renders_per_day` plans of the owner's local day also get `tiktok`. The day is in `notify.timezone`, and non-failed renders already created today with "tiktok" in `targets_json` count toward the limit. With `tiktok_every_render`, every plan gets `tiktok`.
 - Captions: left empty (`{}`). The render step's `execute_plan` uses a non-empty `plan.captions[target]` when present, and otherwise fills the config template.
@@ -72,7 +72,6 @@ Slice 5 built pure shot selection and timeline assembly, plus the Phase 1 batch 
 Mutation-checked: each property fails for its matching bug.
 
 ## Gotchas
-- `one_long_shot` with no in-video drop needs a single shot as long as the whole video. With `ingest.max_shot_s = 8`, it can't be filled for lengths of 12 or 20, so the pair is skipped. None of the fixed recipes use it.
 - A 4-render batch can need up to 56 distinct shots (the every_beat/7 s recipe uses 14 slots). A small library yields fewer plans, not an error.
 - `_beat_grid` in batch.py now calls slice 4's `beat_grid_for_snippet` (task 11). That function raises for a drop outside the window, so `_beat_grid` pre-checks and passes None instead (`tests/integration/test_render_batch_drop_window.py`).
 - Run: `uv run pytest tests/unit/test_recipes_*.py tests/integration/test_recipes_*.py`.

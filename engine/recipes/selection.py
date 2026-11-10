@@ -32,10 +32,9 @@ def select_shots(
     excludes shots used within `settings.shot_cooldown_days` of `now` (unless
     `ignore_cooldown`). Slot 0 gets the best shot for `recipe.opening_shot` that is long
     enough for it; the other slots, longest first, each take a random remaining shot that is
-    long enough. `one_long_shot` ignores
-    `opening_shot` and takes the longest shots, longest first (see `fit_long_shots`). Raises
-    `NotEnoughShotsError` when the library can't fill every slot. Deterministic for a given
-    `rng` state.
+    long enough. `one_long_shot` ignores `opening_shot` and takes the longest shots, longest
+    first (see `fit_long_shots`). Raises `NotEnoughShotsError` when the library can't fill
+    every slot. Deterministic for a given `rng` state.
     """
     cooldown = timedelta(0 if ignore_cooldown else settings.shot_cooldown_days)
     pool = [shot for shot in library if _is_eligible(shot, recipe, settings, now, cooldown)]

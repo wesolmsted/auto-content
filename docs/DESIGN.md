@@ -317,6 +317,9 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
   - Effects are keyed to downbeats, except `shake`, which is on every beat.
   - Segments always start at the proxy's beginning.
   - `plan_batch` writes nothing. The render integration inserts the `recipes` row and updates the shots' `use_count`/`last_used_at`.
+  - `plan_batch` picks the recipe first: the one with the fewest non-failed renders in the last 7 days (this batch included), ties broken by `rng`. It then picks a snippet, trying snippets whose drop lands inside the video length before the rest.
+  - `one_long_shot` chains the longest shots, longest first, and cuts on the last beat the current shot still covers (plus the drop cut). It ignores `opening_shot`.
+  - `ace render one` passes `ignore_limits=True`, skipping the weekly repeat cap and the shot cooldown. `ace render batch` exits 1 if any render failed.
 - Both functions are pure and deterministic given a seeded `rng`. These are the most heavily unit-tested functions in the codebase.
 - **Targets:** every render targets `ig_trial`. It also targets `tiktok` when its recipe is proven on IG (Phase 2) or when config forces it (`cadence.tiktok_every_render`, default false). In Phase 1, one render a day also targets TikTok.
 
@@ -473,7 +476,7 @@ ace status                      # counts per table/status, recent failures
 
 | Layer | What | How |
 | --- | --- | --- |
-| Unit | beat grid → cut points, drop snapping, shot selection, `assemble`, render/post state transitions, `match_posts`, bandit sampling and updates, reward computation, recipe hashing | Pure functions; seeded RNG; property tests (Hypothesis) for timeline invariants: total duration = target, every cut on the grid, no shot reused within a video, a cut at the drop when required |
+| Unit | beat grid → cut points, drop snapping, shot selection, `assemble`, render/post state transitions, `match_posts`, bandit sampling and updates, reward computation, recipe hashing | Pure functions; seeded RNG; property tests (Hypothesis) for timeline invariants: total duration = target, every cut on the grid (any beat for `one_long_shot`), no shot reused within a video, a cut at the drop when required |
 | Integration | scene split, FFmpeg render, ffprobe validation, DB repositories, migrations, hand-off endpoints (download → approval exactly once, preview ≠ approval, 409 on rejected) | Real ffmpeg + temp SQLite against tiny fixtures; FastAPI `TestClient` |
 | Contract | Drive, vision, ntfy, Meta, TikTok clients | Recorded responses (respx/vcrpy); fakes implement the same Protocols |
 | End-to-end (local) | `ingest → render → notify → download → measure (match + metrics)` | One test against fakes, run in CI |
