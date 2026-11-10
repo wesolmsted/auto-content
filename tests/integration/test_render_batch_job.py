@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from engine.config import Settings, load_settings
-from engine.db.enums import RenderStatus, SnippetType
+from engine.db.enums import Orientation, RenderStatus, SnippetType
 from engine.db.models import FootageFileRow, RecipeRow, RenderRow, ShotRow
 from engine.ingest.models import Shot
 from engine.ingest.shot_rows import shot_to_row
@@ -37,6 +37,7 @@ RECIPE = Recipe(
     cut_rate=CutRate.DOWNBEATS,
     opening_shot=OpeningShot.MOST_MOTION,
     footage_category=FootageCategory.MIXED,
+    footage_orientation=Orientation.PORTRAIT,
     length_s=7,
     on_screen_text=OnScreenText.NONE,
     snippet_type=SnippetType.DROP,

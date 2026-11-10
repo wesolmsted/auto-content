@@ -15,7 +15,7 @@ from tests.fakes.notify import FakeNotifier
 REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 BASE_SETTINGS = load_settings(REPO_CONFIG_DIR, env_file=None)
 # The fixed recipe cutting every beat with the high-contrast look, 7 s long.
-EVERY_BEAT_RECIPE = BASE_SETTINGS.recipes.fixed[1]
+EVERY_BEAT_RECIPE = BASE_SETTINGS.recipes.fixed[2]
 NOON_UTC = datetime(2026, 6, 10, 12, 0, tzinfo=UTC)
 EARLIER = datetime(2026, 6, 9, 12, 0, tzinfo=UTC)
 

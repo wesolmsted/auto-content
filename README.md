@@ -96,6 +96,7 @@ Recipe variables to parameterize from day one:
 | `cut_rate` | every_beat · every_2_beats · downbeats · one_long_shot |
 | `opening_shot` | most_motion · person_face · scenic · text_led |
 | `footage_category` | city_night · nature · studio_performance · crowd · mixed |
+| `footage_orientation` | portrait · landscape (a video never mixes the two) |
 | `length_s` | 7 · 12 · 20 |
 | `on_screen_text` | none · hook_lyric · pov_caption |
 | `snippet_type` | hook · drop · intro_build |
@@ -112,6 +113,7 @@ Sketch of a recipe:
   "hard_cut_on_drop": true,
   "opening_shot": "most_motion",
   "footage_category": "city_night",
+  "footage_orientation": "portrait",
   "length_s": 12,
   "on_screen_text": "hook_lyric",
   "text_style": { "position": "lower_third", "case": "lower" },

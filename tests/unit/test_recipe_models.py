@@ -21,6 +21,7 @@ BASE_PARAMS: dict[str, Any] = {
     "hard_cut_on_drop": True,
     "opening_shot": "most_motion",
     "footage_category": "city_night",
+    "footage_orientation": "portrait",
     "length_s": 12,
     "on_screen_text": "hook_lyric",
     "text_style": {"position": "lower_third", "case": "lower"},
@@ -45,6 +46,12 @@ def test_same_params_in_any_key_order_give_the_same_id() -> None:
     assert Recipe.model_validate(reordered).id == make_recipe().id
 
 
+def test_footage_orientation_is_required() -> None:
+    params = {key: value for key, value in BASE_PARAMS.items() if key != "footage_orientation"}
+    with pytest.raises(ValidationError, match="footage_orientation"):
+        Recipe.model_validate(params)
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
@@ -52,6 +59,7 @@ def test_same_params_in_any_key_order_give_the_same_id() -> None:
         {"length_s": 7},
         {"hard_cut_on_drop": False},
         {"effects": []},
+        {"footage_orientation": "landscape"},
         {"text_style": {"position": "top", "case": "lower"}},
     ],
 )

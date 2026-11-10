@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 
 from engine.cli import app
 from engine.config import load_settings
-from engine.db.enums import RenderStatus, SnippetType
+from engine.db.enums import Orientation, RenderStatus, SnippetType
 from engine.db.models import FootageFileRow, RecipeRow, RenderRow, ShotRow, SnippetRow, SongRow
 from engine.db.session import create_db_engine, make_session_factory
 from tests.integration.test_recipes_batch import make_shot_row
@@ -86,7 +86,13 @@ def planned_lines(output: str) -> list[str]:
 
 
 def recipe_id(index: int) -> str:
-    return load_settings().recipes.fixed[index].id
+    """The id of the index-th portrait fixed recipe; the seeded shots are portrait."""
+    portrait = [
+        recipe
+        for recipe in load_settings().recipes.fixed
+        if recipe.footage_orientation is Orientation.PORTRAIT
+    ]
+    return portrait[index].id
 
 
 @pytest.mark.usefixtures("snippets")

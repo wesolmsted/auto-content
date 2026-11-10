@@ -15,7 +15,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from engine.db.enums import Platform, SnippetType
+from engine.db.enums import Orientation, Platform, SnippetType
 from engine.recipes.models import (
     CutRate,
     Effect,
@@ -87,6 +87,7 @@ class RecipeSpace(Section):
     cut_rate: tuple[CutRate, ...]
     opening_shot: tuple[OpeningShot, ...]
     footage_category: tuple[FootageCategory, ...]
+    footage_orientation: tuple[Orientation, ...]
     length_s: tuple[int, ...]
     on_screen_text: tuple[OnScreenText, ...]
     snippet_type: tuple[SnippetType, ...]

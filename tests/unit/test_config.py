@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from engine.config import load_settings
-from engine.db.enums import Platform
+from engine.db.enums import Orientation, Platform
 
 REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 
@@ -23,16 +23,33 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+def test_each_fixed_recipe_runs_in_both_orientations() -> None:
+    settings = load_settings(REPO_CONFIG_DIR, env_file=None)
+    assert settings.recipes.space.footage_orientation == (
+        Orientation.PORTRAIT,
+        Orientation.LANDSCAPE,
+    )
+    orientations_by_style: dict[str, set[Orientation]] = {}
+    for recipe in settings.recipes.fixed:
+        style = recipe.model_copy(update={"footage_orientation": Orientation.PORTRAIT}).id
+        orientations_by_style.setdefault(style, set()).add(recipe.footage_orientation)
+    assert len(orientations_by_style) == 3
+    assert all(
+        orientations == {Orientation.PORTRAIT, Orientation.LANDSCAPE}
+        for orientations in orientations_by_style.values()
+    )
+
+
 def write_local(config_dir: Path, text: str) -> None:
     (config_dir / "local.toml").write_text(text)
 
 
-def test_repo_defaults_load_with_three_distinct_fixed_recipes() -> None:
+def test_repo_defaults_load_with_six_distinct_fixed_recipes() -> None:
     settings = load_settings(REPO_CONFIG_DIR, env_file=None)
     assert settings.vision.model == "claude-sonnet-5-5"
     assert settings.render.fps == 30
     assert settings.data_dir == Path("data")
-    assert len({recipe.id for recipe in settings.recipes.fixed}) == 3
+    assert len({recipe.id for recipe in settings.recipes.fixed}) == 6
     assert settings.captions.templates[Platform.TIKTOK] == "{song}"
     assert settings.anthropic_api_key is None
 

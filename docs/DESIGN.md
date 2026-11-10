@@ -309,7 +309,7 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
 
 ### 7.3 Recipes and assembly (Phase 1)
 - `Recipe` is a Pydantic model whose fields are the README's recipe variables, each an enum. The **recipe space** (allowed values per variable) lives in config.
-- `select_shots(recipe, library, beat_grid, rng) -> list[Shot]`: filter by category and quality floor, exclude shots used in the last `recipes.shot_cooldown_days`, rank by recipe's `opening_shot` criterion for slot 0.
+- `select_shots(recipe, library, beat_grid, rng) -> list[Shot]`: filter by orientation (a render never mixes portrait and landscape shots), category and quality floor, exclude shots used in the last `recipes.shot_cooldown_days`, rank by recipe's `opening_shot` criterion for slot 0.
 - `assemble(recipe, shots, beat_grid) -> Timeline`: compute cut points from `cut_rate`, force a cut on `drop_s` if `hard_cut_on_drop`, fit total length to `length_s` (snapped to the nearest beat), assign shots to slots (a shot must be at least as long as its slot, or it's skipped for that slot), attach effects keyed to beat/downbeat times, attach text events.
 - As built:
   - No cut lands within 0.1 s of another cut or of the ends.
@@ -319,7 +319,7 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
 - Both functions are pure and deterministic given a seeded `rng`. These are the most heavily unit-tested functions in the codebase.
 - **Targets:** every render targets `ig_trial`. It also targets `tiktok` when its recipe is proven on IG (Phase 2) or when config forces it (`cadence.tiktok_every_render`, default false). In Phase 1, one render a day also targets TikTok.
 
-Phase 1 ships **3 fixed recipes** from config. Phase 2 replaces fixed recipes with sampling (§7.7).
+Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and a landscape version (`footage_orientation`). Landscape shots are center-cropped to 9:16. Phase 2 replaces fixed recipes with sampling (§7.7).
 
 ### 7.4 Render (Phase 1)
 - `render(timeline, snippet_audio, out_path)` builds a single FFmpeg filter graph: per-segment `trim` → reframe to 1080×1920 (center crop; face-aware crop is a later improvement) → effects → `concat` → LUT (`lut3d`) → text (`drawtext` with bundled fonts; see "Native-looking text" below) → mux snippet audio → H.264 High / AAC, 30 fps, `+faststart`.
@@ -387,7 +387,7 @@ As built:
   | Variable(s) | Primary metric |
   | --- | --- |
   | `opening_shot`, `snippet_type` | skip rate (lower wins) |
-  | `cut_rate`, `length_s`, `footage_category`, `look`, `effects`, `on_screen_text` | avg watch time ÷ length |
+  | `cut_rate`, `length_s`, `footage_category`, `footage_orientation`, `look`, `effects`, `on_screen_text` | avg watch time ÷ length |
   | tie-breaker | (shares + saves) / reach |
 
   TikTok posts update the `tiktok` platform rows against a TikTok-only baseline. They're scored on avg watch time ÷ length from the latest `export` row once one exists, and on shares / views from the API checkpoints until then. Because exports arrive weekly, TikTok scores lag about a week behind IG.
@@ -525,6 +525,7 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | 2026-11-08 | — | Binary reward vs rolling trial baseline for the bandit | Metrics are noisy and differently scaled; a Beta-Bernoulli per variable is simple and robust. Revisit with more data. |
 | 2026-11-08 | — | Render from local proxies, not Drive originals | Renders become fast and independent of Drive availability. |
 | 2026-11-08 | — | Match manual posts by duration + caption similarity + time, with manual link fallback | No ID links a hand-posted video to its render; these signals are available from both read APIs. Frame-fingerprint matching was considered and deferred until the match rate shows it's needed. |
+| 2026-11-09 | — | `footage_orientation` (portrait · landscape) is a recipe variable; a render never mixes orientations | First real run: landscape music-video shots center-cropped to 9:16 lose content and look different from portrait phone footage. Making it a variable keeps renders consistent and lets the learning loop measure whether cropped landscape footage performs. |
 | 2026-11-08 | — | TikTok watch time from a weekly TikTok Studio export, not browser scraping | Scraping logged-in pages breaks both platforms' terms and risks the account; the export is first-party data for about 2 minutes of owner effort a week. |
 
 ---

@@ -27,6 +27,7 @@ def make_recipe(**overrides: Any) -> Recipe:
         "hard_cut_on_drop": True,
         "opening_shot": "most_motion",
         "footage_category": "mixed",
+        "footage_orientation": "portrait",
         "length_s": 7,
         "on_screen_text": "none",
         "snippet_type": "drop",

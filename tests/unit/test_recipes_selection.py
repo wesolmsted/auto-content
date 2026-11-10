@@ -36,6 +36,7 @@ def make_recipe(**overrides: Any) -> Recipe:
         "hard_cut_on_drop": True,
         "opening_shot": "most_motion",
         "footage_category": "mixed",
+        "footage_orientation": "portrait",
         "length_s": 4,
         "on_screen_text": "none",
         "snippet_type": "drop",
@@ -57,6 +58,7 @@ def make_shot(
     mood: str = "energetic",
     has_face: bool = False,
     last_used_at: datetime | None = None,
+    orientation: Orientation = Orientation.PORTRAIT,
 ) -> Shot:
     return Shot(
         id=shot_id,
@@ -66,7 +68,7 @@ def make_shot(
         width=1080,
         height=1920,
         fps=30.0,
-        orientation=Orientation.PORTRAIT,
+        orientation=orientation,
         motion_score=motion,
         quality_score=quality,
         tags=ShotTags(
@@ -116,6 +118,31 @@ def test_filters_by_footage_category(settings: RecipeSettings) -> None:
 def test_mixed_accepts_any_category(settings: RecipeSettings) -> None:
     library = [make_shot(1, category="nature"), make_shot(2, category="crowd")]
     assert sorted(ids(select(library, settings, footage_category="mixed"))) == [1, 2]
+
+
+@pytest.mark.parametrize(
+    ("footage_orientation", "expected_ids"),
+    [("landscape", [1, 3]), ("portrait", [2, 4])],
+)
+def test_never_mixes_orientations(
+    settings: RecipeSettings, footage_orientation: str, expected_ids: list[int]
+) -> None:
+    library = [
+        make_shot(1, orientation=Orientation.LANDSCAPE),
+        make_shot(2, orientation=Orientation.PORTRAIT),
+        make_shot(3, orientation=Orientation.LANDSCAPE),
+        make_shot(4, orientation=Orientation.PORTRAIT),
+        make_shot(5, orientation=Orientation.SQUARE),
+    ]
+    chosen = select(library, settings, footage_orientation=footage_orientation)
+    assert sorted(ids(chosen)) == expected_ids
+
+
+def test_raises_when_too_few_shots_have_the_orientation(settings: RecipeSettings) -> None:
+    library = [make_shot(shot_id, orientation=Orientation.LANDSCAPE) for shot_id in range(1, 6)]
+    library.append(make_shot(6, orientation=Orientation.PORTRAIT))
+    with pytest.raises(NotEnoughShotsError, match="1 eligible"):
+        select(library, settings, footage_orientation="portrait")
 
 
 def test_shots_below_the_quality_floor_are_excluded(settings: RecipeSettings) -> None:

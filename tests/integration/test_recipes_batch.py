@@ -20,7 +20,15 @@ SONG_TITLE = "Night Drive"
 
 @pytest.fixture
 def settings() -> Settings:
-    return load_settings(REPO_ROOT / "config", env_file=None)
+    """The default config with only its portrait fixed recipes: the seeded shots are portrait."""
+    settings = load_settings(REPO_ROOT / "config", env_file=None)
+    portrait = tuple(
+        recipe
+        for recipe in settings.recipes.fixed
+        if recipe.footage_orientation is Orientation.PORTRAIT
+    )
+    recipes = settings.recipes.model_copy(update={"fixed": portrait})
+    return settings.model_copy(update={"recipes": recipes})
 
 
 @pytest.fixture

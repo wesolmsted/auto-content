@@ -25,12 +25,12 @@ def select_shots(
 ) -> list[Shot]:
     """Pure: one distinct shot per timeline slot, in timeline order (DESIGN.md §7.3).
 
-    Filters by `recipe.footage_category` (any category for `mixed`) and
-    `settings.quality_floor`, and excludes shots used within `settings.shot_cooldown_days` of
-    `now`. Slot 0 gets the best shot for `recipe.opening_shot` that is long enough for it; the
-    other slots, longest first, each take a random remaining shot that is long enough. Raises
-    `NotEnoughShotsError` when the library can't fill every slot. Deterministic for a given
-    `rng` state.
+    Filters by `recipe.footage_orientation` (a render never mixes orientations),
+    `recipe.footage_category` (any category for `mixed`) and `settings.quality_floor`, and
+    excludes shots used within `settings.shot_cooldown_days` of `now`. Slot 0 gets the best
+    shot for `recipe.opening_shot` that is long enough for it; the other slots, longest first,
+    each take a random remaining shot that is long enough. Raises `NotEnoughShotsError` when
+    the library can't fill every slot. Deterministic for a given `rng` state.
     """
     slots = plan_slots(recipe, beat_grid)
     pool = [shot for shot in library if _is_eligible(shot, recipe, settings, now)]
@@ -59,6 +59,8 @@ def select_shots(
 
 
 def _is_eligible(shot: Shot, recipe: Recipe, settings: RecipeSettings, now: datetime) -> bool:
+    if shot.orientation != recipe.footage_orientation:
+        return False
     if (
         recipe.footage_category is not FootageCategory.MIXED
         and shot.tags.category != recipe.footage_category

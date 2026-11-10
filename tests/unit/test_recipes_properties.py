@@ -63,6 +63,7 @@ recipes = st.builds(
     hard_cut_on_drop=st.booleans(),
     opening_shot=st.sampled_from(OpeningShot),
     footage_category=st.sampled_from(FootageCategory),
+    footage_orientation=st.just(Orientation.PORTRAIT),
     length_s=st.integers(1, 30),
     on_screen_text=st.sampled_from(OnScreenText),
     snippet_type=st.sampled_from(SnippetType),

@@ -8,7 +8,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from engine.db.enums import Platform, SnippetType
+from engine.db.enums import Orientation, Platform, SnippetType
 
 TIME_TOLERANCE_S = 1e-6
 
@@ -87,6 +87,7 @@ class Recipe(BaseModel):
     hard_cut_on_drop: bool = True
     opening_shot: OpeningShot
     footage_category: FootageCategory
+    footage_orientation: Orientation
     length_s: int = Field(gt=0)
     on_screen_text: OnScreenText
     text_style: TextStyle = TextStyle()
