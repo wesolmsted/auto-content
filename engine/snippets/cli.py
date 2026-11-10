@@ -7,7 +7,7 @@ from engine.config import load_settings
 from engine.db.enums import SnippetType
 from engine.db.session import create_db_engine, make_session_factory, session_scope
 from engine.snippets import store
-from engine.snippets.analysis import analyze_song, detect_drop
+from engine.snippets.analysis import analyze_song, detect_drop, snap_start_to_downbeat
 
 app = typer.Typer(help="Songs and the snippets cut from them.", no_args_is_help=True)
 
@@ -15,7 +15,9 @@ app = typer.Typer(help="Songs and the snippets cut from them.", no_args_is_help=
 @app.command()
 def add(
     audio: Annotated[Path, typer.Argument(help="Song audio file.")],
-    start: Annotated[float, typer.Option(help="Snippet start in the song, seconds.")],
+    start: Annotated[
+        float, typer.Option(help="Snippet start in the song, seconds; snapped to a downbeat.")
+    ],
     end: Annotated[float, typer.Option(help="Snippet end in the song, seconds.")],
     snippet_type: Annotated[SnippetType, typer.Option("--type", help="Snippet type.")],
     drop: Annotated[float | None, typer.Option(help="Override the detected drop time.")] = None,
@@ -26,8 +28,6 @@ def add(
         _fail(f"no audio file at {audio}")
     if end <= start:
         _fail(f"--end ({end}) must be after --start ({start})")
-    if drop is not None and not start <= drop <= end:
-        _fail(f"--drop ({drop}) must lie within --start and --end")
 
     settings = load_settings()
     engine = create_db_engine(settings.db_url)
@@ -40,6 +40,15 @@ def add(
             song_id, song = found
         if start < 0 or end > song.duration_s:
             _fail(f"snippet must lie within the song (0 to {song.duration_s:.2f} s)")
+        try:
+            snapped_start = snap_start_to_downbeat(song.downbeats, start, end)
+        except ValueError as error:
+            _fail(str(error))
+        if snapped_start != start:
+            typer.echo(f"start snapped {start:.2f} → {snapped_start:.2f} s (downbeat)")
+            start = snapped_start
+        if drop is not None and not start <= drop <= end:
+            _fail(f"--drop ({drop}) must lie within the snapped start ({start:.2f}) and --end")
         if drop is None:
             drop = detect_drop(audio, song, start, end, settings.snippets)
         snippet_id = store.add_snippet(session, song_id, snippet_type, start, end, drop, label)
