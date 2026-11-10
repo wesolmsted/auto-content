@@ -12,7 +12,7 @@ from datetime import time
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from engine.db.enums import Orientation, Platform, SnippetType
@@ -231,11 +231,16 @@ class Settings(BaseSettings):
     meta_ig_user_id: str | None = _secret("META_IG_USER_ID")
     tiktok_client_key: str | None = _secret("TIKTOK_CLIENT_KEY")
     tiktok_client_secret: SecretStr | None = _secret("TIKTOK_CLIENT_SECRET")
-    ntfy_server: str | None = _secret("NTFY_SERVER")
+    ntfy_server: str | None = Field(default="https://ntfy.sh", validation_alias="NTFY_SERVER")
     ntfy_topic: SecretStr | None = _secret("NTFY_TOPIC")
     ntfy_token: SecretStr | None = _secret("NTFY_TOKEN")
     handoff_base_url: str | None = _secret("HANDOFF_BASE_URL")
     handoff_token: SecretStr | None = _secret("HANDOFF_TOKEN")
+
+    @field_validator("google_oauth_client_json")
+    @classmethod
+    def _expand_home(cls, path: Path | None) -> Path | None:
+        return path.expanduser() if path is not None else None
 
     @classmethod
     def settings_customise_sources(

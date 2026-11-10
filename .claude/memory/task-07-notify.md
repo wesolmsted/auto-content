@@ -67,7 +67,7 @@ Slice 7 built phone notifications for ready renders.
 2. Choose a long random topic (e.g. `openssl rand -hex 16`). Anyone who knows a topic on ntfy.sh can read it, so treat it as a secret.
 3. In the app, subscribe to that topic on `https://ntfy.sh`, or on your server if you self-host.
 4. In `.env`, set:
-   - `NTFY_SERVER=https://ntfy.sh` (required; there is no Python default);
+   - `NTFY_SERVER` only for a self-hosted server (defaults to `https://ntfy.sh`);
    - `NTFY_TOPIC=<topic>`;
    - `NTFY_TOKEN` only for a server with access control;
    - `HANDOFF_BASE_URL` to the Mac's Tailscale URL.

@@ -137,4 +137,17 @@ def test_empty_values_copied_from_env_example_are_ignored(config_dir: Path, tmp_
     settings = load_settings(config_dir, env_file=env_file)
     assert settings.data_dir == Path("data")
     assert settings.anthropic_api_key is None
-    assert settings.ntfy_server is None
+    assert settings.ntfy_server == "https://ntfy.sh"
+
+
+def test_ntfy_server_defaults_to_ntfy_sh(config_dir: Path) -> None:
+    assert load_settings(config_dir, env_file=None).ntfy_server == "https://ntfy.sh"
+
+
+def test_google_client_json_path_expands_the_home_directory(
+    config_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_JSON", "~/secrets/client.json")
+    settings = load_settings(config_dir, env_file=None)
+    assert settings.google_oauth_client_json == tmp_path / "secrets" / "client.json"

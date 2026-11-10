@@ -59,7 +59,7 @@ def test_notify_test_sends_a_test_notification(ntfy_env: None) -> None:
 def test_notify_test_without_ntfy_config_exits_1_naming_what_is_missing(cli_env: Path) -> None:
     result = runner.invoke(app, ["notify", "test"])
     assert result.exit_code == 1
-    assert "NTFY_SERVER" in result.output
+    assert "NTFY_SERVER" not in result.output
     assert "NTFY_TOPIC" in result.output
 
 

@@ -415,7 +415,7 @@ Reuses the Drive poller with the references folder. Measurement (scene cuts, bea
   - `GOOGLE_OAUTH_CLIENT_JSON`, `ANTHROPIC_API_KEY`;
   - `META_APP_ID`, `META_APP_SECRET`, `META_IG_USER_ID`;
   - `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`;
-  - `NTFY_SERVER`, `NTFY_TOPIC`, `NTFY_TOKEN` (optional);
+  - `NTFY_SERVER` (default `https://ntfy.sh`), `NTFY_TOPIC`, `NTFY_TOKEN` (optional);
   - `HANDOFF_BASE_URL` (Tailscale URL), `HANDOFF_TOKEN`.
 
   OAuth refresh tokens are written to `data/secrets/` with `0600` permissions.
