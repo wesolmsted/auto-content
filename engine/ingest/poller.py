@@ -34,7 +34,8 @@ def poll_footage(
        status `downloaded`. Failures increment `attempts` and record `error`; a row reaching
        `max_attempts` becomes `failed`.
 
-    The caller commits the session.
+    Commits after every state change, so no write transaction stays open during a Drive call
+    and a crash keeps the progress of finished files.
     """
     inbox_folder_id, processed_folder_id = footage_folders(settings)
     completed, failed_moves = complete_tagged_footage(
@@ -68,7 +69,7 @@ def complete_tagged_footage(
 ) -> tuple[int, int]:
     """Move every `tagged` file to processed, mark it `done` and delete its local download.
 
-    Returns (completed, newly failed).
+    Commits after each file. Returns (completed, newly failed).
     """
     completed = failed = 0
     for row in _rows_with_status(session, FootageStatus.TAGGED):
@@ -76,12 +77,13 @@ def complete_tagged_footage(
             drive.move(row.drive_file_id, processed_folder_id)
         except Exception as error:
             failed += record_failure(row, error, max_attempts)
-            continue
-        if row.local_path:
-            Path(row.local_path).unlink(missing_ok=True)
-        row.local_path = None
-        advance(row, FootageStatus.DONE)
-        completed += 1
+        else:
+            if row.local_path:
+                Path(row.local_path).unlink(missing_ok=True)
+            row.local_path = None
+            advance(row, FootageStatus.DONE)
+            completed += 1
+        session.commit()
     return completed, failed
 
 
@@ -118,12 +120,14 @@ def _record_listing(
         )
         if row is None:
             row = _insert(session, drive_file)
+            session.commit()
             if row.status == FootageStatus.DUPLICATE:
                 duplicates += 1
             else:
                 new += 1
         if row.status == FootageStatus.DUPLICATE:
             _move_duplicate(drive, row, processed_folder_id)
+            session.commit()
     return new, duplicates
 
 
@@ -169,10 +173,11 @@ def _download_new(
             drive.download(row.drive_file_id, dest)
         except Exception as error:
             failed += record_failure(row, error, max_attempts)
-            continue
-        row.local_path = str(dest)
-        advance(row, FootageStatus.DOWNLOADED)
-        downloaded += 1
+        else:
+            row.local_path = str(dest)
+            advance(row, FootageStatus.DOWNLOADED)
+            downloaded += 1
+        session.commit()
     return downloaded, failed
 
 
