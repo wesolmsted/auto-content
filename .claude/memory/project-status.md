@@ -15,6 +15,15 @@ type: project
 - Song "you dont dance": 137.9 BPM, drops at 42.23 s and 111.87 s. Active snippets 4–6 (1–3 were deactivated, since they predate start snapping).
 - `footage_orientation` became a recipe variable at the owner's request; landscape stays center-cropped for now.
 
+## Owner environment (set up 2026-11-09; no secrets here)
+- Done: Google OAuth (Desktop client, token in `data/secrets/`), Drive footage Inbox/Processed ids in `config/local.toml`, `ANTHROPIC_API_KEY`, ntfy topic (app subscription verified), `ffmpeg-full`.
+- `HANDOFF_BASE_URL` is `http://127.0.0.1:8000` (Mac only); Tailscale isn't set up, so notification links don't open on the phone yet.
+- Song audio lives in `~/.config/auto-content/audio/`; the Google client JSON is outside the repo too.
+- Meta/TikTok developer apps: not started.
+- Step-by-step setup guide (Claude doc): https://claude.ai/artifact/UhXZwgqQrk7g2Vr8RyEXLx
+- Local DB: renders 1–4 (mixed orientation, before task 12) and 5 (landscape only) are `ready`, all notified; none downloaded yet.
+- To test notifications outside 16:00–19:00 ET, set `ACE_NOTIFY__QUIET_HOURS__START=00:00:00` and `ACE_NOTIFY__QUIET_HOURS__END=00:00:00`.
+
 ## Open items
 - Q13 caption-match `min_score`: tune with real data.
 - A render whose notification keeps failing stays `ready` forever; expiry doesn't run when ntfy isn't configured (task-14 questions).
