@@ -4,53 +4,27 @@ description: Where work stopped (2026-11-09), open owner questions with recommen
 type: project
 ---
 
-**State as of 2026-11-09:** Phase 1 (DESIGN.md §12, slices 1–10 plus the render-batch integration) is fully merged to `main`. `make check` passes: 560 tests, 1 skipped (drawtext unavailable in local Homebrew ffmpeg). The owner paused work here. Nothing has been run against real accounts yet.
+**State as of 2026-11-09 (evening):** Phase 1 is merged, and the first real test run is done (Drive ingest → snippets → render → ntfy → hand-off page on localhost). The owner's answers to Q1–12 are applied (tasks 12–15 plus the config fix on main). `make check` passes 628 tests.
 
 **Why:** lets the next session resume without re-deriving context.
-**How to apply:** read this first. Ask the owner the open questions before changing the behavior they cover, then run the next tasks with the parallel agent workflow in CLAUDE.md.
+**How to apply:** read this first; check the open items with the owner before changing the behavior they cover.
 
-## Owner questions (answered 2026-11-09: recommendations in bold accepted for 1–12; 13 stays open)
-1. **ntfy server:** default `NTFY_SERVER` to `https://ntfy.sh`? **Yes.**
-2. **Notification title:** keep "Hand-off ready: <song> · <cut rate>, <look>"? **Keep for now.**
-3. **Problem files:** a file with zero usable shots = failure, and scratch files of failed downloads are kept. **OK.**
-4. **Drop detection:** auto-detect for every snippet type, and use a manual `--drop` exactly as typed. **OK.**
-5. **`one_long_shot`:** use the longest shots and cut only when one runs out. **Yes.**
-6. **Drop in short videos:** the planner prefers snippets whose drop falls inside the video length. **Yes.**
-7. **Recipe balance:** balance choice per recipe, not per recipe×snippet pair. **Yes.**
-8. **Vision refusal fallbacks:** leave off for the prototype. **Yes.**
-9. **Expiry clock:** count hand-off expiry from `notified_at`, not `created_at`. **Yes.**
-10. **Expiry check:** run `supersede_expired` at the start of `ace notify pending`; it has no caller yet. **Yes.**
-11. **Failed renders:** `ace render batch` exits non-zero if any render failed. **Yes.**
-12. **Dev-loop limits:** `ace render one` skips the weekly cap and shot cooldown. **Yes.**
-13. **Caption matching:** with weights caption 0.7 / time 0.3 and `min_score` 0.3, a post whose caption shares no words with the provided one rarely auto-matches. Keep it, relying on manual link as the fallback, or lower `min_score`? Undecided; tune with real data.
+## Real-run findings (2026-11-09)
+- Footage: 3 files → 88 shots. 75 are landscape, from a music video with fast cuts (avg 1.3 s); 13 are portrait. Ingest took 8 min.
+- Portrait recipes and the 20 s downbeats recipe can't be filled yet. Each needs 13–16 distinct shots, and the 20 s recipe needs shots of 1.74 s or longer. The owner needs more portrait and longer clips.
+- Song "you dont dance": 137.9 BPM, drops at 42.23 s and 111.87 s. Active snippets 4–6 (1–3 were deactivated, since they predate start snapping).
+- `footage_orientation` became a recipe variable at the owner's request; landscape stays center-cropped for now.
 
-## Owner action items
-- **Now:** done 2026-11-09 (hook reloaded, ffmpeg-full installed so drawtext works and the suite runs 561 tests with no skips, GitHub checked).
-- **Before the first real run:**
-  - a Google OAuth desktop client (`GOOGLE_OAUTH_CLIENT_JSON`), then `ace auth google`, and set the Drive folder ids;
-  - `ANTHROPIC_API_KEY`;
-  - the ntfy app + topic (task-07 memory);
-  - Tailscale + `HANDOFF_BASE_URL`/`HANDOFF_TOKEN` (task-08 memory);
-  - Meta and TikTok developer apps with read scopes (task-09 memory).
-- **Later:** real songs and footage for tuning; one sample TikTok Studio export before Phase 2.
+## Open items
+- Q13 caption-match `min_score`: tune with real data.
+- A render whose notification keeps failing stays `ready` forever; expiry doesn't run when ntfy isn't configured (task-14 questions).
+- `render one` with `ignore_limits` could reuse a shot when n > 1 (only n = 1 uses it today).
+- `one_long_shot` ignores `opening_shot`.
+- The hand-off page is localhost-only until the owner sets up Tailscale (setup guide doc, step 6).
 
-## Next tasks (not started)
-1. **Apply the owner's answers** to questions 1–12 (all recommendations accepted).
-2. **Shared-file follow-ups:**
-   - bump `measure.meta_graph_url` (currently v23.0) after checking the real account;
-   - optionally add `error`/`attempts` to `posts`;
-   - add `tzdata` as a dependency;
-   - add `engine/render/fonts/*` to package data;
-   - resolve `luts_dir`/`font_file` against the config dir (`ace` currently has to run from the repo root);
-   - optionally move the snippet analysis constants into config.
-3. **Native-looking text** (DESIGN §7.4):
-   - bundle TikTok Sans (OFL) plus the closest OFL match for Instagram;
-   - style presets: shadow, outline, rounded box;
-   - safe zones and wrapping;
-   - `ace snippets add --text`, with `plan_batch` passing hook text.
-
-   Needs `ffmpeg-full` locally.
-4. **Schedule:** launchd jobs per the DESIGN §3 schedule, and a first real end-to-end run with the owner.
-5. **Then Phase 2:** TikTok export import, the learning loop, the weekly report.
-
-Agent worktrees from Phase 1 remain under `.claude/worktrees/` (gitignored). Their branches are all merged and can be removed.
+## Next tasks
+1. Owner reviews renders 1–5 and the hand-off flow; tune from that feedback.
+2. Shared-file follow-ups: add `tzdata`; add `engine/render/fonts/*` to package data; resolve `luts_dir`/`font_file` against the config dir; bump `measure.meta_graph_url` after checking the real account.
+3. Native-looking text (DESIGN §7.4).
+4. launchd schedule (DESIGN §3).
+5. Meta/TikTok developer apps, then measure; then Phase 2.

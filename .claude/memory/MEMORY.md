@@ -27,7 +27,7 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 06: render](task-06-render.md): render/validate/execute_plan, filter graph, effects, LUTs, TextRenderStyle, Anton font, drawtext needs ffmpeg-full locally
 - [Task 07: notify](task-07-notify.md): NtfyNotifier, quiet hours (4–7 pm ET window), pending hand-off notifications, FakeNotifier, owner's ntfy setup steps
 - [Task 08: hand-off page](task-08-handoff.md): routes, cookie auth, download = approval transaction, link-post URL parsing (IG shortcode/TikTok id), expiry, Tailscale serve runbook
-- [Project status](project-status.md): where work stopped, open questions for the owner, owner action items, next tasks. Read first when resuming
+- [Project status](project-status.md): first real run done 2026-11-09, findings, open items, next tasks. Read first when resuming
 - [Task 09: measure](task-09-measure.md): read-only Meta/TikTok readers, match_posts, run_measure, ace measure due / posts link / auth meta|tiktok, unverified API details, owner's developer-app setup
 - [Task 11: render batch](task-11-render-batch.md): run_render_batch flow, ace render batch/one, shot_rows now in engine/ingest/shot_rows.py, beat-grid consolidation, e2e test
 - [Task 13: ingest lock](task-13-ingest-lock.md): ingest commits per file and step so slow downloads/moves don't lock SQLite; how the lock test reproduces it
