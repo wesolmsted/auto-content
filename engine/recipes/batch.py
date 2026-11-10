@@ -45,10 +45,12 @@ def plan_batch(
 ) -> list[RenderPlan]:
     """Up to `n` render plans pairing a fixed recipe with an active snippet of its type.
 
-    A recipe already rendered `recipes.max_repeats_per_week` times in the last 7 days (failed
-    renders aside, this batch included) is not picked. Shots planned earlier in the batch count
-    as used `now`, so the cooldown keeps them out of later plans. Pairs the shot library can't
-    fill are skipped; the batch is shorter when no pair is left. Every plan targets `ig_trial`;
+    Each plan goes to the recipe with the fewest renders in the last 7 days (failed renders
+    aside, this batch included; ties broken by `rng`), on a random snippet of its type. When
+    no snippet of that recipe can be filled, the next recipe in that order is tried. A recipe
+    already rendered `recipes.max_repeats_per_week` times in that window is not picked. Shots
+    planned earlier in the batch count as used `now`, so the cooldown keeps them out of later
+    plans. The batch is shorter when no recipe can be filled. Every plan targets `ig_trial`;
     the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
     `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
     Captions are left empty: the render step fills them from the config templates.
@@ -63,15 +65,14 @@ def plan_batch(
 
     plans: list[RenderPlan] = []
     for _ in range(n):
-        pairs = [
-            (recipe, snippet)
+        recipes = [
+            recipe
             for recipe in settings.recipes.fixed
             if repeats[recipe.id] < settings.recipes.max_repeats_per_week
-            for snippet in snippets
-            if snippet.snippet_type is recipe.snippet_type
         ]
-        rng.shuffle(pairs)
-        planned = _first_fillable(pairs, library, rng, settings, now)
+        planned = _first_fillable(
+            _least_rendered_first(recipes, repeats, rng), snippets, library, rng, settings, now
+        )
         if planned is None:
             break
         recipe, snippet, shots = planned
@@ -98,25 +99,51 @@ def plan_batch(
     return plans
 
 
+def _least_rendered_first(
+    recipes: list[Recipe], repeats: Counter[str], rng: random.Random
+) -> list[Recipe]:
+    tie_breaks = {recipe.id: rng.random() for recipe in recipes}
+    return sorted(recipes, key=lambda recipe: (repeats[recipe.id], tie_breaks[recipe.id]))
+
+
 def _first_fillable(
-    pairs: list[tuple[Recipe, SnippetChoice]],
+    recipes: list[Recipe],
+    snippets: list[SnippetChoice],
     library: list[Shot],
     rng: random.Random,
     settings: Settings,
     now: datetime,
 ) -> tuple[Recipe, SnippetChoice, list[Shot]] | None:
-    for recipe, snippet in pairs:
-        try:
-            shots = select_shots(recipe, library, snippet.beat_grid, rng, settings.recipes, now)
-        except NotEnoughShotsError as error:
-            logger.warning(
-                "skipping recipe for snippet: %s",
-                error,
-                extra={"job": "render_batch", "row_id": snippet.id},
-            )
-            continue
-        return recipe, snippet, shots
+    """The first recipe, in the given order, that one of its snippets and the library can fill."""
+    for recipe in recipes:
+        candidates = [
+            snippet for snippet in snippets if snippet.snippet_type is recipe.snippet_type
+        ]
+        rng.shuffle(candidates)
+        for snippet in candidates:
+            shots = _try_select(recipe, snippet, library, rng, settings, now)
+            if shots is not None:
+                return recipe, snippet, shots
     return None
+
+
+def _try_select(
+    recipe: Recipe,
+    snippet: SnippetChoice,
+    library: list[Shot],
+    rng: random.Random,
+    settings: Settings,
+    now: datetime,
+) -> list[Shot] | None:
+    try:
+        return select_shots(recipe, library, snippet.beat_grid, rng, settings.recipes, now)
+    except NotEnoughShotsError as error:
+        logger.warning(
+            "skipping recipe for snippet: %s",
+            error,
+            extra={"job": "render_batch", "row_id": snippet.id},
+        )
+        return None
 
 
 def _active_snippets(session: Session, snippet_id: int | None) -> list[SnippetChoice]:

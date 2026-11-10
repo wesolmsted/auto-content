@@ -307,3 +307,61 @@ def test_same_seed_gives_the_same_batch_and_nothing_is_written(
     assert db_session.scalar(select(func.count()).select_from(RenderRow)) == 0
     assert db_session.scalar(select(func.count()).select_from(RecipeRow)) == 0
     assert db_session.scalar(select(func.max(ShotRow.last_used_at))) is None
+
+
+def add_drop_snippets(session: Session, count: int) -> list[int]:
+    song_id = session.scalars(select(SongRow.id).where(SongRow.title == SONG_TITLE)).one()
+    snippets = [
+        SnippetRow(
+            song_id=song_id,
+            label=f"drop {index}",
+            snippet_type=SnippetType.DROP,
+            start_s=10.0,
+            end_s=32.0,
+            drop_s=18.0,
+        )
+        for index in range(count)
+    ]
+    session.add_all(snippets)
+    session.flush()
+    return [snippet.id for snippet in snippets]
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_each_recipe_gets_a_turn_however_many_snippets_match_it(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    add_drop_snippets(db_session, 8)
+    plans = plan(db_session, settings, n=3, seed=seed)
+    assert sorted(render_plan.recipe_id for render_plan in plans) == sorted(
+        recipe.id for recipe in fixed
+    )
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_the_recipe_with_the_fewest_renders_this_week_goes_first(
+    db_session: Session,
+    settings: Settings,
+    fixed: tuple[Recipe, ...],
+    seeded: dict[str, int],
+    seed: int,
+) -> None:
+    for day in range(2):
+        add_render(db_session, fixed[0], seeded["drop"], NOW - timedelta(days=day + 1), [])
+    add_render(db_session, fixed[2], seeded["hook"], NOW - timedelta(days=1), [])
+    add_render(db_session, fixed[1], seeded["drop"], NOW - timedelta(days=9), [])
+    plans = plan(db_session, settings, n=3, seed=seed)
+    recipe_ids = [render_plan.recipe_id for render_plan in plans]
+    assert recipe_ids[0] == fixed[1].id
+    assert sorted(recipe_ids[1:]) == sorted([fixed[1].id, fixed[2].id])
+
+
+def test_ties_between_recipes_are_broken_at_random(
+    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
+) -> None:
+    first_picks = {plan(db_session, settings, n=1, seed=seed)[0].recipe_id for seed in range(30)}
+    assert first_picks == {recipe.id for recipe in fixed}
