@@ -111,7 +111,7 @@ def _match_platform(
 def _resolve_manual_link(
     post: PostRow, candidates: Sequence[PlatformVideo], summary: MeasureSummary
 ) -> None:
-    """A manual link stores the IG reel shortcode (or TikTok id) and no posting time; swap in the
+    """A manual link stores the IG reel shortcode and no posting time; swap in the
     platform's own id and the posting time, which metric checkpoints need."""
     for video in candidates:
         if _is_linked_video(post, video):
@@ -129,7 +129,7 @@ def _resolve_manual_link(
 def _is_linked_video(post: PostRow, video: PlatformVideo) -> bool:
     if video.external_id == post.external_id:
         return True
-    if post.platform != Platform.IG_TRIAL or video.permalink is None:
+    if video.permalink is None:
         return False
     try:
         return parse_post_url(Platform.IG_TRIAL, video.permalink).external_id == post.external_id

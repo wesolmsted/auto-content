@@ -41,8 +41,6 @@ class DriveSettings(Section):
     footage_processed_folder_id: str | None = None
     references_inbox_folder_id: str | None = None
     references_processed_folder_id: str | None = None
-    exports_inbox_folder_id: str | None = None
-    exports_processed_folder_id: str | None = None
     keep_reference_originals: bool
     download_chunk_mb: int = Field(gt=0)
     max_retries: int = Field(ge=0)
@@ -132,8 +130,6 @@ class CaptionSettings(Section):
 
 class CadenceSettings(Section):
     renders_per_day: int = Field(gt=0)
-    tiktok_every_render: bool
-    tiktok_renders_per_day: int = Field(ge=0)
 
 
 class HandoffSettings(Section):
@@ -169,7 +165,6 @@ class MatchSettings(Section):
 class MeasureSettings(Section):
     checkpoint_hours: tuple[int, ...]
     meta_graph_url: str
-    tiktok_api_url: str
     token_expiry_warn_days: int = Field(ge=0)
     max_attempts: int = Field(gt=0)
 
@@ -229,8 +224,6 @@ class Settings(BaseSettings):
     meta_app_id: str | None = _secret("META_APP_ID")
     meta_app_secret: SecretStr | None = _secret("META_APP_SECRET")
     meta_ig_user_id: str | None = _secret("META_IG_USER_ID")
-    tiktok_client_key: str | None = _secret("TIKTOK_CLIENT_KEY")
-    tiktok_client_secret: SecretStr | None = _secret("TIKTOK_CLIENT_SECRET")
     ntfy_server: str | None = Field(default="https://ntfy.sh", validation_alias="NTFY_SERVER")
     ntfy_topic: SecretStr | None = _secret("NTFY_TOPIC")
     ntfy_token: SecretStr | None = _secret("NTFY_TOKEN")

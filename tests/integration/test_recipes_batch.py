@@ -142,10 +142,6 @@ def shot_ids(plans: list[RenderPlan]) -> list[int]:
     return [shot_id for render_plan in plans for shot_id in render_plan.timeline.shot_ids]
 
 
-def with_cadence(settings: Settings, **cadence: Any) -> Settings:
-    return settings.model_copy(update={"cadence": settings.cadence.model_copy(update=cadence)})
-
-
 def plan(session: Session, settings: Settings, n: int = 4, seed: int = 1) -> list[RenderPlan]:
     return plan_batch(session, settings, random.Random(seed), NOW, n)
 
@@ -205,54 +201,18 @@ def test_recently_used_shots_are_skipped(
     assert not set(shot_ids(plans)) & recent_ids
 
 
-def test_first_render_of_the_day_also_targets_tiktok(
-    db_session: Session, settings: Settings, seeded: dict[str, int]
-) -> None:
-    plans = plan(db_session, with_cadence(settings, tiktok_renders_per_day=1))
-    assert [render_plan.targets for render_plan in plans] == [
-        (Platform.IG_TRIAL, Platform.TIKTOK),
-        (Platform.IG_TRIAL,),
-        (Platform.IG_TRIAL,),
-        (Platform.IG_TRIAL,),
-    ]
-
-
-def test_no_tiktok_target_once_today_has_its_tiktok_render(
+def test_every_plan_targets_only_ig_trial(
     db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
 ) -> None:
-    add_render(
-        db_session, fixed[0], seeded["drop"], NOW - timedelta(hours=2), ["ig_trial", "tiktok"]
-    )
+    add_render(db_session, fixed[0], seeded["drop"], NOW - timedelta(hours=2), ["ig_trial"])
     plans = plan(db_session, settings)
     assert [render_plan.targets for render_plan in plans] == [(Platform.IG_TRIAL,)] * 4
-
-
-def test_the_day_boundary_is_in_the_owners_timezone(
-    db_session: Session, settings: Settings, fixed: tuple[Recipe, ...], seeded: dict[str, int]
-) -> None:
-    # NOW is 06:00 in Los Angeles; this render was at 23:00 the previous local day.
-    la_settings = settings.model_copy(
-        update={"notify": settings.notify.model_copy(update={"timezone": "America/Los_Angeles"})}
-    )
-    add_render(
-        db_session, fixed[0], seeded["drop"], NOW - timedelta(hours=7), ["ig_trial", "tiktok"]
-    )
-    assert plan(db_session, la_settings)[0].targets == (Platform.IG_TRIAL, Platform.TIKTOK)
-    assert plan(db_session, settings)[0].targets == (Platform.IG_TRIAL,)
-
-
-def test_tiktok_every_render_targets_tiktok_on_all(
-    db_session: Session, settings: Settings, seeded: dict[str, int]
-) -> None:
-    plans = plan(db_session, with_cadence(settings, tiktok_every_render=True))
-    both = (Platform.IG_TRIAL, Platform.TIKTOK)
-    assert [render_plan.targets for render_plan in plans] == [both] * 4
 
 
 def test_captions_are_left_for_the_render_step_to_fill(
     db_session: Session, settings: Settings, seeded: dict[str, int]
 ) -> None:
-    plans = plan(db_session, with_cadence(settings, tiktok_renders_per_day=1), n=2)
+    plans = plan(db_session, settings, n=2)
     assert [render_plan.captions for render_plan in plans] == [{}, {}]
 
 

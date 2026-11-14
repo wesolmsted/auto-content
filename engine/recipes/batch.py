@@ -5,7 +5,6 @@ import random
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -52,9 +51,7 @@ def plan_batch(
     that recipe can be filled, the next recipe in that order is tried. A recipe already
     rendered `recipes.max_repeats_per_week` times in that window is not picked. Shots planned
     earlier in the batch count as used `now`, so the cooldown keeps them out of later plans.
-    The batch is shorter when no recipe can be filled. Every plan targets `ig_trial`;
-    the first plans of the owner's day (`notify.timezone`) also target `tiktok` until
-    `cadence.tiktok_renders_per_day` is reached, or all do with `cadence.tiktok_every_render`.
+    The batch is shorter when no recipe can be filled. Every plan targets `ig_trial`.
     Captions are left empty: the render step fills them from the config templates.
     With `snippet_id`, only that snippet is planned. With `ignore_limits` (the `ace render one`
     dev loop), neither the weekly cap nor the shot cooldown applies.
@@ -62,9 +59,6 @@ def plan_batch(
     snippets = _active_snippets(session, snippet_id)
     library = _tagged_shots(session)
     repeats = _recent_render_counts(session, now)
-    tiktok_left = settings.cadence.tiktok_renders_per_day - _tiktok_renders_today(
-        session, settings.notify.timezone, now
-    )
 
     plans: list[RenderPlan] = []
     for _ in range(n):
@@ -85,17 +79,12 @@ def plan_batch(
         if planned is None:
             break
         recipe, snippet, shots = planned
-
-        targets = [Platform.IG_TRIAL]
-        if settings.cadence.tiktok_every_render or tiktok_left > 0:
-            targets.append(Platform.TIKTOK)
-            tiktok_left -= 1
         plans.append(
             RenderPlan(
                 recipe_id=recipe.id,
                 snippet_id=snippet.id,
                 timeline=assemble(recipe, shots, snippet.beat_grid),
-                targets=tuple(targets),
+                targets=(Platform.IG_TRIAL,),
                 captions={},
             )
         )
@@ -228,15 +217,3 @@ def _recent_render_counts(session: Session, now: datetime) -> Counter[str]:
         )
     )
     return Counter(recipe_ids)
-
-
-def _tiktok_renders_today(session: Session, timezone: str, now: datetime) -> int:
-    local_now = now.astimezone(ZoneInfo(timezone))
-    day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    targets = session.scalars(
-        select(RenderRow.targets_json).where(
-            RenderRow.created_at >= day_start,
-            RenderRow.status != RenderStatus.FAILED,
-        )
-    )
-    return sum(Platform.TIKTOK in render_targets for render_targets in targets)

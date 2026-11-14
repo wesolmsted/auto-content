@@ -1,6 +1,6 @@
 # Auto Content Engine
 
-A general-purpose content pipeline for music short-form video. You drop in raw footage, and it cuts that footage to song snippets and sends each finished video to your phone. You post the ones you like yourself, as Instagram Trial Reels and on TikTok. The system then finds those posts, reads back the results, and tells you which styles to double down on and what to shoot next.
+A general-purpose content pipeline for music short-form video. You drop in raw footage, and it cuts that footage to song snippets and sends each finished video to your phone. You post the ones you like yourself, as Instagram Trial Reels. The system then finds those posts, reads back the results, and tells you which styles to double down on and what to shoot next.
 
 **Design goal:** your effort goes into capturing good footage and tapping "post". The system handles the editing, experimenting and learning.
 
@@ -15,14 +15,15 @@ A general-purpose content pipeline for music short-form video. You drop in raw f
 - Run continuous style experiments on Instagram Trial Reels, which reach non-followers only.
 - Learn which style "ingredients" win, and bias future edits toward them.
 - Produce a weekly shoot list so capture effort is spent on what performs.
-- Take in reference reels and TikToks you supply and turn their style into runnable recipes.
-- **Nothing goes live unless you post it yourself from the Instagram or TikTok app.**
+- Take in reference reels you supply and turn their style into runnable recipes.
+- **Nothing goes live unless you post it yourself from the Instagram app.**
 
 **Non-goals**
+- Platforms other than Instagram. TikTok was dropped to keep the scope small (DESIGN.md D11).
 - Posting through any platform API, including drafts. The system never posts; it only reads metrics.
 - Choosing which songs to promote. The system works with any snippet.
 - Generative AI footage. Every frame is your own real footage.
-- Downloading other creators' content, or scraping any platform. You source reference videos yourself, and stats come from official read-only APIs and exports.
+- Downloading other creators' content, or scraping any platform. You source reference videos yourself, and stats come from the official read-only API.
 
 ---
 
@@ -32,9 +33,8 @@ A general-purpose content pipeline for music short-form video. You drop in raw f
 | --- | --- | --- |
 | Weekly | Shoot (guided by last week's shoot list) and upload clips to the Google Drive footage folder | your call |
 | Once per song | Pick 2–4 snippets (15–20 s; hook, drop or build) | ~5 min |
-| As you find them | Save a reel or TikTok you like and upload it to the Google Drive references folder | ~10 s each |
+| As you find them | Save a reel you like and upload it to the Google Drive references folder | ~10 s each |
 | Daily | Tap the phone notification, preview the video, **Save video** (that's the approval), then post it in the app; or Reject | ~1–2 min per video |
-| Weekly | Download the TikTok Studio analytics export and drop it in the Drive exports folder | ~2 min |
 | Weekly | Read the report and shoot list; graduate winning trials in the Instagram app | ~10 min |
 
 ---
@@ -48,10 +48,9 @@ flowchart LR
     I --> E[Recipe engine<br/>cut shots to beats]
     E --> N[Notify<br/>phone notification]
     N --> H[Hand-off page - you<br/>save video = approve]
-    H -->|you post in the app| P[Instagram Trial Reels / TikTok]
+    H -->|you post in the app| P[Instagram Trial Reels]
     H -->|rejected = taste signal| L
     P --> M[Measure<br/>match posts, pull metrics]
-    X[TikTok Studio export - you<br/>weekly → Drive folder] --> M
     M --> L[Learn<br/>score ingredients, bandit]
     L -->|next batch| E
     L -->|winning traits| S[Weekly shoot list]
@@ -59,7 +58,7 @@ flowchart LR
     S -->|guides the shoot| C
 ```
 
-The learning step has two outputs: **better edits** for the next batch, and a **shoot list** for you. Trial reels that win are graduated to your followers (by you, in the app, as the weekly report recommends), and their recipes are used for TikTok. That's how the system doubles down.
+The learning step has two outputs: **better edits** for the next batch, and a **shoot list** for you. Trial reels that win are graduated to your followers (by you, in the app, as the weekly report recommends), and their recipes get more of the next batches. That's how the system doubles down.
 
 ---
 
@@ -123,18 +122,18 @@ Sketch of a recipe:
 }
 ```
 
-Every video targets Instagram Trial Reels. Some also target TikTok: one a day at first, then recipes proven on Instagram.
+Every video targets Instagram Trial Reels.
 
 ### 4. Hand-off and approval
 - When a video is ready, you get a **phone notification** (ntfy). Tapping it opens the hand-off page, a small web page on your Mac reached privately over Tailscale.
-- The page shows a preview, a **Save video** button, each platform's caption with a **Copy caption** button, and reminders (Instagram: turn on *Trial*; TikTok: add the official sound).
+- The page shows a preview, a **Save video** button, the caption with a **Copy caption** button, and a reminder to turn on *Trial*.
 - **Saving the video is the approval.** Previewing doesn't count. On iPhone, Save opens the share sheet, so the video goes straight into Photos.
 - **Reject** drops the video, with an optional reason tag. Videos not saved within 72 hours expire. Both feed the learning step as a taste signal.
 
 ### 5. Posting (you, in the app)
-The system never posts. Instagram's API has no draft mode (anything uploaded through it goes live), so every video is handed to you instead. You post from the Instagram app (as a Trial Reel) or the TikTok app. This also means no posting-API audits or caps.
+The system never posts. Instagram's API has no draft mode (anything uploaded through it goes live), so every video is handed to you instead. You post from the Instagram app as a Trial Reel. This also means no posting-API audits or caps.
 
-Matching each post back to its video: posting by hand leaves no ID linking the post to its video, so the system finds your recent posts through the read-only APIs and matches them on:
+Matching each post back to its video: posting by hand leaves no ID linking the post to its video, so the system finds your recent posts through the read-only Instagram API and matches them on:
 - posted after you saved that video;
 - length within 0.5 s;
 - caption similar to the one provided.
@@ -144,8 +143,7 @@ If a post isn't matched, paste its link (Share → Copy link) on the hand-off pa
 ### 6. Measure
 - Pull metrics at 24 h and 72 h after each matched post, stored against the post and its recipe.
 - **Instagram** (Meta Graph API, read-only): `views`, `reach`, `saved`, `shares`, `ig_reels_avg_watch_time`, `reels_skip_rate` ([reference](https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights)).
-- **TikTok** (Display API, read-only): `view_count`, `like_count`, `comment_count`, `share_count` ([docs](https://developers.tiktok.com/doc/tiktok-api-v1-video-query)). No retention data.
-- **TikTok watch time:** from the weekly TikTok Studio export you drop in Drive. The system imports it and links each row to its post. There's no scraping or browser automation.
+- There's no scraping or browser automation.
 
 ### 7. Learn
 - Treat recipes as arms in a multi-armed bandit (Thompson sampling), with about 80% exploit and 20% explore.
@@ -158,25 +156,23 @@ If a post isn't matched, paste its link (Share → Copy link) on the hand-off pa
 | Skip rate (lower is better) | IG API | Opening shot, snippet type |
 | Avg watch time ÷ length | IG API | Cut rate, length, footage category |
 | (Shares + saves) / reach | IG API | Tie-breaker |
-| Avg watch time ÷ length | TikTok weekly export | TikTok scoring (lags about a week) |
-| Shares / views | TikTok API | TikTok scoring until the export arrives |
-| Views at 72 h | both | Distribution (noisy) |
+| Views at 72 h | IG API | Distribution (noisy) |
 | Saved / rejected / expired | hand-off page | Taste prior |
 
 Doubling down:
 1. Trials that beat the trial baseline are flagged in the weekly report, and you graduate them to followers in the app.
-2. Winning recipes are re-rendered with fresh shots and handed off for TikTok.
+2. Winning recipes are re-rendered with fresh shots and sampled more often.
 3. Winning footage traits become shoot-list items.
 
 ### 8. Weekly report and shoot list
 - Winners, losers, and confidence for each recipe variable.
 - Trials worth graduating.
-- The hand-off funnel (ready → saved → posted), plus any posts or export rows that need linking.
+- The hand-off funnel (ready → saved → posted), plus any posts that need linking.
 - Shoot list: concrete instructions, e.g. "more night city shots with motion toward camera; fewer static landscapes."
 - Library gaps, e.g. "winning recipe needs low-angle handheld shots; you have 2."
 
 ### 9. Style reference intake
-You save reels or TikToks you like and upload them to a dedicated Google Drive folder. The script picks up each new file and analyzes it. Downloading is entirely your call; the system never fetches anything from Instagram or TikTok.
+You save reels you like and upload them to a dedicated Google Drive folder. The script picks up each new file and analyzes it. Downloading is entirely your call; the system never fetches anything from Instagram.
 
 **Intake (Google Drive references folder)**
 - **Source:** a separate Drive folder, e.g. `Content Engine / References / Inbox`.
@@ -216,7 +212,7 @@ These live in [docs/DESIGN.md](docs/DESIGN.md) (§4 layout, §5 data model, §8 
 - **Media:** FFmpeg, PySceneDetect, librosa, OpenCV, OCR.
 - **AI:** Claude vision for shot tagging and reference analysis.
 - **Hand-off:** a FastAPI page over Tailscale, with ntfy phone notifications.
-- **Metrics:** Meta Graph API and TikTok Display API (read-only only), plus the weekly TikTok Studio export.
+- **Metrics:** Meta Graph API (read-only).
 
 Secrets go in environment variables or `.env`, which is gitignored.
 
@@ -228,9 +224,6 @@ Secrets go in environment variables or `.env`, which is gitignored.
 | --- | --- | --- |
 | Instagram API has no draft mode | Any API upload would go live | The system never posts; every video is handed off and posted by you |
 | Manual posting leaves no link between post and video | Metrics can't be attributed automatically | Match on post time, length and caption; paste the link when it misses; track the match rate |
-| TikTok has no trial/test mode | Every TikTok post is public to followers and the For You feed | Experiment on IG; TikTok gets proven recipes plus a small test share |
-| No TikTok retention metrics via API | Weak TikTok signal | Weekly TikTok Studio export for watch time; learn style mostly from IG |
-| TikTok Display API access for your own app | May need review before it can read your videos | Verify during setup; fall back to manual links + export-only scoring |
 | Trial reels in the Meta API | Not yet confirmed that unposted-to-followers trials appear with insights | Verify during setup; manual links as fallback |
 | Noisy metrics; `reels_skip_rate` is estimated and in development per Meta | False winners | Score ingredients over many posts |
 | Taste is hard to automate | Off-brand edits | You choose what to save and post; rejections feed the scoring |
@@ -254,11 +247,10 @@ Build order is prototype first: each step works end to end before refinements ar
 - [ ] 3 fixed recipes rendered with FFmpeg
 - [ ] Phone notifications (ntfy)
 - [ ] Hand-off page (preview, save = approve, reject, copy caption)
-- [ ] Read-only Meta + TikTok access and post matching
+- [ ] Read-only Meta access and post matching
 - [ ] Metric pulls at 24 h and 72 h
 
 ### Phase 2 — Learning loop
-- [ ] TikTok Studio weekly export import
 - [ ] Per-variable scoring and Thompson sampling for batch generation
 - [ ] Graduation recommendations
 - [ ] Weekly report and shoot list
@@ -278,9 +270,7 @@ Build order is prototype first: each step works end to end before refinements ar
 ## Open design questions
 
 The live list is in [docs/DESIGN.md §14](docs/DESIGN.md). The main ones:
-- What exactly does the TikTok Studio export contain? (Needs a sample before building the importer.)
 - Do trial reels show up with insights in the Meta API?
-- Can your own TikTok app read your videos without full app review?
 - Is post matching accurate enough without extra signals?
 - Captions and hashtags: templated, or generated per post?
 

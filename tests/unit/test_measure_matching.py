@@ -105,10 +105,6 @@ def test_duration_filter_uses_the_tolerance_and_is_skipped_when_unknown(
     assert (len(matches) == 1) is matched
 
 
-def test_a_video_on_another_platform_is_never_matched() -> None:
-    assert match_posts([awaiting()], [video(platform=Platform.TIKTOK)], MATCH_SETTINGS) == []
-
-
 def test_pairs_scoring_below_min_score_stay_unmatched() -> None:
     weak = video(caption="totally different", posted_at=DOWNLOADED + timedelta(hours=60))
     assert expected_score(0.0, 60.0) < MATCH_SETTINGS.min_score

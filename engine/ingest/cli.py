@@ -76,9 +76,3 @@ def footage() -> None:
 def references() -> None:
     """Analyze new style reference videos (Phase 3)."""
     not_implemented()
-
-
-@app.command()
-def exports() -> None:
-    """Import TikTok Studio analytics exports (Phase 2)."""
-    not_implemented()

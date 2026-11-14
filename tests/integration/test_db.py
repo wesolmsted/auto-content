@@ -37,7 +37,7 @@ def test_upgrade_on_empty_sqlite_creates_every_model_table(tmp_path: Path) -> No
     tables = set(inspect(engine).get_table_names())
     engine.dispose()
     assert tables == set(Base.metadata.tables) | {"alembic_version"}
-    assert {"footage_files", "variable_scores", "style_references", "metric_imports"} <= tables
+    assert {"footage_files", "variable_scores", "style_references"} <= tables
 
 
 def test_migrations_match_the_models_exactly(db_url: str) -> None:
@@ -132,8 +132,13 @@ def test_foreign_keys_are_enforced_on_sqlite(db_session: Session) -> None:
 def test_one_post_per_render_and_platform(db_session: Session) -> None:
     render = add_render(db_session)
     assert render.status is RenderStatus.RENDERING
+    other_render = RenderRow(
+        recipe_id=render.recipe_id, snippet_id=render.snippet_id, timeline_json={}
+    )
+    db_session.add(other_render)
+    db_session.flush()
     db_session.add(PostRow(render_id=render.id, platform=Platform.IG_TRIAL))
-    db_session.add(PostRow(render_id=render.id, platform=Platform.TIKTOK))
+    db_session.add(PostRow(render_id=other_render.id, platform=Platform.IG_TRIAL))
     db_session.flush()
     assert {post.status for post in db_session.query(PostRow)} == {PostStatus.AWAITING_POST}
 

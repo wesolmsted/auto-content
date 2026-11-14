@@ -17,7 +17,7 @@ from engine.notify.quiet_hours import is_quiet, next_send_time
 logger = logging.getLogger(__name__)
 
 JOB = "notify_handoff"
-PLATFORM_NAMES = {Platform.IG_TRIAL: "IG Trial", Platform.TIKTOK: "TikTok"}
+PLATFORM_NAMES = {Platform.IG_TRIAL: "IG Trial"}
 
 
 def send_pending_handoff_notifications(

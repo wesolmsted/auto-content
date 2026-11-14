@@ -22,7 +22,7 @@ Task 11 wired planning, rendering, shot usage and notifications into `ace render
   - `--n` defaults to `cadence.renders_per_day`.
   - `--recipe` narrows `settings.recipes.fixed` to that recipe. An id that isn't in it exits 1 with `unknown recipe <id>`.
   - `--snippet` is passed to `plan_batch(snippet_id=...)`.
-  - `--dry-run` prints `plan k: recipe=… snippet=… targets=ig_trial,tiktok duration=12.00s`, then a `  cuts:` line and a `  shots:` line. It writes nothing and sends nothing.
+  - `--dry-run` prints `plan k: recipe=… snippet=… targets=ig_trial duration=12.00s`, then a `  cuts:` line and a `  shots:` line. It writes nothing and sends nothing.
   - Otherwise it prints `planned= ready= failed= notified=` and exits 1 if any render failed (task 12). Failures are on the rows.
   - The notifier is built with `ntfy_notifier_from_settings`. If ntfy isn't configured, the batch still renders: it logs a warning and prints `notifications skipped: ntfy is not configured: set …`.
   - A `ValueError` exits 1 with its message. The main case is ntfy configured but `HANDOFF_BASE_URL` unset during the posting window: the renders are already committed, and only the notifications fail.
@@ -53,6 +53,6 @@ Task 11 wired planning, rendering, shot usage and notifications into `ace render
 ## Deviations / gotchas
 - `plan_batch` gained a keyword-only `snippet_id` filter. `--snippet` and `ace render one` need it, and there was no other way to make it work without duplicating the planner.
 - The e2e test uses its own recipe (downbeats, 7 s, warm, so 4 slots of 2 s or less). The 3 fixed recipes need 10–14 distinct shots each, and the portrait fixture gives only 4 shots per build.
-- `ace render one` goes through `plan_batch` with `ignore_limits=True` (task 12): TikTok targeting applies, the weekly cap and shot cooldown don't.
+- `ace render one` goes through `plan_batch` with `ignore_limits=True` (task 12): the weekly cap and shot cooldown don't.
 - Rendering needs `render.luts_dir` to resolve. The default is relative (`config/luts`), so run from the repo root or set an absolute path. Tests set it with `ACE_RENDER__LUTS_DIR`.
 - No fixed recipe uses text, so the local Homebrew ffmpeg (which has no `drawtext`) renders the whole batch.

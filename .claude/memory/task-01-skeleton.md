@@ -27,7 +27,7 @@ Slice 1 created every shared file up front, so slices 2–10 only fill in their 
 
 ## DB (`engine/db/`)
 - ORM classes all end in `Row`: `FootageFileRow`, `ShotRow`, `SongRow`, `SnippetRow`, `RecipeRow`, `RenderRow`, `PostRow`, `MetricRow`, `MetricImportRow`, `VariableScoreRow`, `StyleReferenceRow`. Convert to and from the domain models in your module.
-- Enums in `engine/db/enums.py`: `FootageStatus` (adds `duplicate`), `RenderStatus`, `PostStatus`, `MetricImportStatus`, `StyleReferenceStatus`, `Platform` (`ig_trial`, `tiktok`), `MatchMethod`, `MetricCheckpoint` (`24h`, `72h`, `export`), `MetricSource`, `Orientation`, `SnippetType`, `RejectReason`; plus `INTERNAL_SCORE_PLATFORM = "internal"`.
+- Enums in `engine/db/enums.py`: `FootageStatus` (adds `duplicate`), `RenderStatus`, `PostStatus`, `StyleReferenceStatus`, `Platform` (`ig_trial` only, D11), `MatchMethod`, `MetricCheckpoint` (`24h`, `72h`), `MetricSource` (`api`), `Orientation`, `SnippetType`, `RejectReason`; plus `INTERNAL_SCORE_PLATFORM = "internal"`.
 - Enum columns are stored as plain strings, so a new member needs no migration; unknown values are rejected on write. Datetimes must be timezone-aware: naive ones are rejected, and reads come back as UTC.
 - `create_db_engine(url)` turns on SQLite foreign keys. Also `make_session_factory(engine)`, `session_scope(factory)` (commit or rollback), `upgrade_to_head(url)` and `table_counts(session)`.
 - Columns added beyond DESIGN §5: `shots.proxy_path`, `renders.ffmpeg_argv_json`, and `updated_at` on `renders`, `posts` and `style_references`.
@@ -62,12 +62,12 @@ Slice 1 created every shared file up front, so slices 2–10 only fill in their 
 
 ## CLI ownership
 `engine/cli.py` only mounts the module CLIs.
-- `ingest/cli.py`: `ingest footage|references|exports`.
+- `ingest/cli.py`: `ingest footage|references`.
 - `snippets/cli.py`: `snippets add|list`.
 - `render/cli.py`: `render batch|one`.
 - `notify/cli.py`: `notify test`.
 - `handoff/cli.py`: `serve`.
-- `measure/cli.py`: `measure due`, `posts link` (`posts_app`), and `auth_meta` / `auth_tiktok`.
+- `measure/cli.py`: `measure due`, `posts link` (`posts_app`), and `auth_meta`.
 - `drive/cli.py`: `auth_google`.
 - `learn/cli.py`: `learn update` and `report weekly` (`report_app`).
 

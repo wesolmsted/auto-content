@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Auto Content Engine: a general-purpose pipeline that cuts raw footage into beat-synced short videos, posts approved ones to Instagram Trial Reels and TikTok, and learns which styles win.
+Auto Content Engine: a general-purpose pipeline that cuts raw footage into beat-synced short videos, hands approved ones off for posting as Instagram Trial Reels, and learns which styles win.
 
 ## Read first
 

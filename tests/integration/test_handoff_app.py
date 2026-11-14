@@ -31,9 +31,8 @@ SETTINGS = BASE_SETTINGS.model_copy(update={"handoff_token": SecretStr(TOKEN)})
 RECIPE = BASE_SETTINGS.recipes.fixed[1]
 NOW = datetime(2026, 6, 10, 21, 0, tzinfo=UTC)
 VIDEO_BYTES = bytes(range(256)) * 40
-BOTH_TARGETS = (Platform.IG_TRIAL, Platform.TIKTOK)
+TARGETS = (Platform.IG_TRIAL,)
 IG_URL = "https://www.instagram.com/reel/DAbc12xY/"
-TIKTOK_URL = "https://www.tiktok.com/@creator/video/7301234567890123456"
 
 
 class Clock:
@@ -58,7 +57,7 @@ class Handoff:
     def add_render(
         self,
         status: RenderStatus = RenderStatus.READY,
-        targets: tuple[Platform, ...] = BOTH_TARGETS,
+        targets: tuple[Platform, ...] = TARGETS,
         song_title: str = "Night Drive",
         created_at: datetime = NOW,
         post_statuses: dict[Platform, PostStatus] | None = None,
@@ -181,7 +180,7 @@ def test_every_route_needs_the_login_cookie(handoff: Handoff, method: str, path:
     response = handoff.client.request(
         method,
         path.format(id=render_id),
-        data={"reason": "boring", "platform": "tiktok", "url": TIKTOK_URL},
+        data={"reason": "boring", "platform": "ig_trial", "url": IG_URL},
         follow_redirects=False,
     )
 
@@ -201,17 +200,13 @@ def test_home_lists_ready_renders_newest_first_then_approved_ones_awaiting_a_pos
     newer_ready = signed_in.add_render(created_at=NOW - timedelta(hours=1))
     awaiting = signed_in.add_render(
         RenderStatus.APPROVED,
-        post_statuses={
-            Platform.IG_TRIAL: PostStatus.MATCHED,
-            Platform.TIKTOK: PostStatus.AWAITING_POST,
-        },
+        post_statuses={Platform.IG_TRIAL: PostStatus.AWAITING_POST},
     )
     signed_in.add_render(
-        RenderStatus.APPROVED,
-        post_statuses={
-            Platform.IG_TRIAL: PostStatus.MATCHED,
-            Platform.TIKTOK: PostStatus.NOT_POSTED,
-        },
+        RenderStatus.APPROVED, post_statuses={Platform.IG_TRIAL: PostStatus.MATCHED}
+    )
+    signed_in.add_render(
+        RenderStatus.APPROVED, post_statuses={Platform.IG_TRIAL: PostStatus.NOT_POSTED}
     )
     signed_in.add_render(RenderStatus.REJECTED)
     signed_in.add_render(RenderStatus.SUPERSEDED)
@@ -234,10 +229,9 @@ def test_handoff_page_shows_preview_save_captions_reminders_and_reject(signed_in
     assert f'href="/handoff/{render_id}/download"' in html
     assert "Save video" in html
     assert "Night Drive on ig_trial" in html
-    assert "Night Drive on tiktok" in html
-    assert html.count("Copy caption") == 2
-    assert "Trial" in html
-    assert "official sound" in html
+    assert html.count("Copy caption") == 1
+    assert "Turn on Trial" in html
+    assert "TikTok" not in html
     for reason in RejectReason:
         assert f'value="{reason.value}"' in html
     assert f'action="/handoff/{render_id}/reject"' in html
@@ -249,10 +243,7 @@ def test_handoff_page_offers_link_post_after_approval_and_hides_save_and_reject(
 ) -> None:
     render_id = signed_in.add_render(
         RenderStatus.APPROVED,
-        post_statuses={
-            Platform.IG_TRIAL: PostStatus.AWAITING_POST,
-            Platform.TIKTOK: PostStatus.MATCHED,
-        },
+        post_statuses={Platform.IG_TRIAL: PostStatus.AWAITING_POST},
     )
 
     html = signed_in.client.get(f"/handoff/{render_id}").text
@@ -332,7 +323,6 @@ def test_first_download_approves_and_creates_one_post_per_target(signed_in: Hand
     posts = signed_in.posts(render_id)
     assert [(post.platform, post.status) for post in posts] == [
         (Platform.IG_TRIAL, PostStatus.AWAITING_POST),
-        (Platform.TIKTOK, PostStatus.AWAITING_POST),
     ]
 
 
@@ -437,19 +427,17 @@ def test_link_post_marks_the_post_matched_manually(signed_in: Handoff) -> None:
 
     response = signed_in.client.post(
         f"/handoff/{render_id}/link",
-        data={"platform": "tiktok", "url": TIKTOK_URL + "?lang=en"},
+        data={"platform": "ig_trial", "url": IG_URL + "?igsh=MTc4bWx6"},
         follow_redirects=False,
     )
 
     assert response.status_code == 303
     assert response.headers["location"] == f"/handoff/{render_id}"
-    ig_post, tiktok_post = signed_in.posts(render_id)
-    assert tiktok_post.status == PostStatus.MATCHED
-    assert tiktok_post.match_method == MatchMethod.MANUAL
-    assert tiktok_post.external_id == "7301234567890123456"
-    assert tiktok_post.permalink == TIKTOK_URL
-    assert ig_post.status == PostStatus.AWAITING_POST
-    assert ig_post.external_id is None
+    (post,) = signed_in.posts(render_id)
+    assert post.status == PostStatus.MATCHED
+    assert post.match_method == MatchMethod.MANUAL
+    assert post.external_id == "DAbc12xY"
+    assert post.permalink == IG_URL
 
 
 def test_link_post_works_from_not_posted(signed_in: Handoff) -> None:
@@ -505,7 +493,7 @@ def test_link_post_without_a_post_for_that_platform_is_404(signed_in: Handoff) -
     render_id = signed_in.add_render(targets=(Platform.IG_TRIAL,))
 
     response = signed_in.client.post(
-        f"/handoff/{render_id}/link", data={"platform": "tiktok", "url": TIKTOK_URL}
+        f"/handoff/{render_id}/link", data={"platform": "ig_trial", "url": IG_URL}
     )
 
     assert response.status_code == 404

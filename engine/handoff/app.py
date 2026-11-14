@@ -38,11 +38,8 @@ COOKIE_NAME = "ace_handoff"
 COOKIE_MAX_AGE_S = 365 * 24 * 3600
 NOT_SIGNED_IN = "Not signed in. Open the hand-off login link once on this device."
 
-PLATFORM_LABELS = {Platform.IG_TRIAL: "Instagram Trial Reel", Platform.TIKTOK: "TikTok"}
-POSTING_REMINDERS = {
-    Platform.IG_TRIAL: "Turn on Trial before you share it.",
-    Platform.TIKTOK: "Add the official sound if the song drives the post.",
-}
+PLATFORM_LABELS = {Platform.IG_TRIAL: "Instagram Trial Reel"}
+POSTING_REMINDERS = {Platform.IG_TRIAL: "Turn on Trial before you share it."}
 
 HANDOFF_DIR = Path(__file__).parent
 TEMPLATES = Jinja2Templates(directory=HANDOFF_DIR / "templates")

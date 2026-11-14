@@ -21,9 +21,9 @@ TOPIC_URL = f"{SERVER}/{TOPIC}"
 
 NOTIFICATION = Notification(
     title="Hand-off ready: Night Drive - every_beat high_contrast",
-    body="7s for IG Trial + TikTok",
+    body="7s for IG Trial",
     click_url="https://mac.tailnet.test/handoff/12",
-    tags=("clapper", "ig_trial", "tiktok"),
+    tags=("clapper", "ig_trial"),
 )
 
 
@@ -56,10 +56,10 @@ def test_posts_the_body_to_the_topic_with_title_click_tags_and_bearer_token(
 
     assert route.call_count == 1
     request = route.calls.last.request
-    assert request.content == b"7s for IG Trial + TikTok"
+    assert request.content == b"7s for IG Trial"
     assert request.headers["Title"] == "Hand-off ready: Night Drive - every_beat high_contrast"
     assert request.headers["Click"] == "https://mac.tailnet.test/handoff/12"
-    assert request.headers["Tags"] == "clapper,ig_trial,tiktok"
+    assert request.headers["Tags"] == "clapper,ig_trial"
     assert request.headers["Authorization"] == f"Bearer {TOKEN}"
 
 

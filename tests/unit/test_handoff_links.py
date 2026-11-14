@@ -30,32 +30,6 @@ def test_parses_instagram_reel_urls_to_the_shortcode(url: str, expected: PostLin
 
 
 @pytest.mark.parametrize(
-    ("url", "expected"),
-    [
-        (
-            "https://www.tiktok.com/@some.creator/video/7301234567890123456",
-            PostLink(
-                "7301234567890123456",
-                "https://www.tiktok.com/@some.creator/video/7301234567890123456",
-            ),
-        ),
-        (
-            "https://m.tiktok.com/@creator/video/7301234567890123456/?is_from_webapp=1&lang=en",
-            PostLink(
-                "7301234567890123456", "https://www.tiktok.com/@creator/video/7301234567890123456"
-            ),
-        ),
-        (
-            "https://tiktok.com/video/7301234567890123456",
-            PostLink("7301234567890123456", "https://www.tiktok.com/video/7301234567890123456"),
-        ),
-    ],
-)
-def test_parses_tiktok_video_urls_to_the_video_id(url: str, expected: PostLink) -> None:
-    assert parse_post_url(Platform.TIKTOK, url) == expected
-
-
-@pytest.mark.parametrize(
     ("platform", "url", "message"),
     [
         (Platform.IG_TRIAL, "", "paste"),
@@ -64,12 +38,6 @@ def test_parses_tiktok_video_urls_to_the_video_id(url: str, expected: PostLink) 
         (Platform.IG_TRIAL, "https://www.instagram.com/reel/", "/reel/"),
         (Platform.IG_TRIAL, "https://evil.example/reel/DAbc12xY/", "instagram.com"),
         (Platform.IG_TRIAL, "ftp://www.instagram.com/reel/DAbc12xY/", "instagram.com"),
-        (Platform.IG_TRIAL, "https://www.tiktok.com/@a/video/7301234567890123456", "instagram"),
-        (Platform.TIKTOK, "https://www.instagram.com/reel/DAbc12xY/", "tiktok.com"),
-        (Platform.TIKTOK, "https://vm.tiktok.com/ZMabc123/", "full"),
-        (Platform.TIKTOK, "https://www.tiktok.com/@creator/video/abc", "/video/"),
-        (Platform.TIKTOK, "https://www.tiktok.com/@creator", "/video/"),
-        (Platform.TIKTOK, "https://nottiktok.com/@a/video/7301234567890123456", "tiktok.com"),
     ],
 )
 def test_rejects_urls_it_cannot_parse_with_a_clear_message(

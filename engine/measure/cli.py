@@ -1,5 +1,4 @@
-import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Annotated
 
 import httpx
@@ -11,27 +10,16 @@ from engine.db.session import create_db_engine, make_session_factory, session_sc
 from engine.measure.api import PlatformReadError
 from engine.measure.auth import (
     META_SCOPES,
-    AuthError,
     StoredToken,
-    code_from_redirect,
     exchange_meta_token,
-    exchange_tiktok_code,
     expiry_warning,
     load_token,
-    new_pkce_verifier,
-    pkce_challenge,
-    refresh_tiktok_token,
     save_token,
-    tiktok_authorize_url,
     token_path,
 )
 from engine.measure.job import LinkError, link_post, run_measure
 from engine.measure.meta import MetaReader
 from engine.measure.readers import PlatformReader
-from engine.measure.tiktok import TikTokReader
-
-DEFAULT_TIKTOK_REDIRECT_URI = "http://localhost:8765/callback/"
-TIKTOK_REFRESH_MARGIN = timedelta(minutes=5)
 
 app = typer.Typer(help="Match posts to renders and pull metrics.", no_args_is_help=True)
 posts_app = typer.Typer(help="Posts made by hand on the platforms.", no_args_is_help=True)
@@ -60,12 +48,8 @@ def due() -> None:
 
 def make_readers(settings: Settings, client: httpx.Client, now: datetime) -> list[PlatformReader]:
     """Readers for the platforms that have a token, printing why any platform is skipped."""
-    readers: list[PlatformReader] = []
-    for make in (_meta_reader, _tiktok_reader):
-        reader = make(settings, client, now)
-        if reader is not None:
-            readers.append(reader)
-    return readers
+    reader = _meta_reader(settings, client, now)
+    return [reader] if reader is not None else []
 
 
 def _meta_reader(settings: Settings, client: httpx.Client, now: datetime) -> MetaReader | None:
@@ -84,34 +68,6 @@ def _meta_reader(settings: Settings, client: httpx.Client, now: datetime) -> Met
         token.access_token,
         settings.http,
     )
-
-
-def _tiktok_reader(settings: Settings, client: httpx.Client, now: datetime) -> TikTokReader | None:
-    path = token_path(settings.secrets_dir, Platform.TIKTOK)
-    token = load_token(path)
-    if token is None:
-        typer.echo("skipping tiktok: no TikTok token, run `ace auth tiktok`")
-        return None
-    if token.expires_at is not None and token.expires_at - now <= TIKTOK_REFRESH_MARGIN:
-        if settings.tiktok_client_key is None or settings.tiktok_client_secret is None:
-            typer.echo("skipping tiktok: set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET")
-            return None
-        try:
-            token = refresh_tiktok_token(
-                client,
-                settings.measure.tiktok_api_url,
-                settings.tiktok_client_key,
-                settings.tiktok_client_secret.get_secret_value(),
-                token,
-                settings.http,
-                now,
-            )
-        except (AuthError, PlatformReadError) as error:
-            typer.echo(f"skipping tiktok: token refresh failed: {error}")
-            return None
-        save_token(token, path)
-    _warn_on_expiry(Platform.TIKTOK, token, settings, now)
-    return TikTokReader(client, settings.measure.tiktok_api_url, token.access_token, settings.http)
 
 
 def _warn_on_expiry(
@@ -178,43 +134,3 @@ def auth_meta() -> None:
     typer.echo(f"Meta token saved to {path} (expires {expires})")
     if settings.meta_ig_user_id is None:
         typer.echo("also set META_IG_USER_ID (your Instagram professional account id)")
-
-
-def auth_tiktok(
-    redirect_uri: Annotated[
-        str, typer.Option(help="Redirect URI registered in the TikTok app's Login Kit settings.")
-    ] = DEFAULT_TIKTOK_REDIRECT_URI,
-) -> None:
-    """One-time read-only TikTok authorization."""
-    settings = load_settings()
-    if settings.tiktok_client_key is None or settings.tiktok_client_secret is None:
-        typer.echo("set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET first")
-        raise typer.Exit(code=1)
-    state = secrets.token_urlsafe(16)
-    verifier = new_pkce_verifier()
-    url = tiktok_authorize_url(
-        settings.tiktok_client_key, redirect_uri, state, pkce_challenge(verifier)
-    )
-    typer.echo(f"Open this link, log in and allow access:\n{url}")
-    redirected = typer.prompt("Paste the full URL the browser was sent to")
-    now = datetime.now(UTC)
-    with httpx.Client(timeout=settings.http.timeout_s) as client:
-        try:
-            token = exchange_tiktok_code(
-                client,
-                settings.measure.tiktok_api_url,
-                settings.tiktok_client_key,
-                settings.tiktok_client_secret.get_secret_value(),
-                code_from_redirect(redirected.strip(), state),
-                redirect_uri,
-                verifier,
-                settings.http,
-                now,
-            )
-        except (AuthError, PlatformReadError) as error:
-            typer.echo(f"TikTok authorization failed: {error}")
-            raise typer.Exit(code=1) from None
-    path = token_path(settings.secrets_dir, Platform.TIKTOK)
-    save_token(token, path)
-    renew_by = token.reauthorize_by.date().isoformat() if token.reauthorize_by else "unknown"
-    typer.echo(f"TikTok token saved to {path} (re-authorize by {renew_by})")

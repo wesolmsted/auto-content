@@ -64,11 +64,6 @@ The URL is stripped first. The scheme must be http/https; a URL with no scheme i
   - code is `[A-Za-z0-9_-]+`;
   - `external_id` = the shortcode, and `permalink` = `https://www.instagram.com/reel/<code>/`.
   - `/p/<code>/` is rejected.
-- **TikTok**:
-  - hosts `tiktok.com`, `www.`, `m.`;
-  - path `[/@user]/video/<digits>`, query ignored;
-  - `external_id` = the numeric id, and `permalink` = `https://www.tiktok.com[/@user]/video/<id>`.
-  - `vm.`/`vt.tiktok.com` short links are rejected with "open the link and paste the full URL". Resolving them would need a network call.
 - Linking sets `matched`, `match_method=manual`, `external_id` and `permalink`. It **leaves `posted_at` NULL**: the URL doesn't carry it.
 
 ## Reaching it from the phone over Tailscale (no secrets here)

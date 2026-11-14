@@ -2,7 +2,6 @@ import shutil
 import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -21,15 +20,8 @@ from tests.integration.test_measure_job import add_post
 
 REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 GRAPH = "https://graph.example.test/v23.0"
-TIKTOK_API = "https://open.example.test/v2"
 IG_USER = "17841400000000000"
-SECRET_ENV = (
-    "META_APP_ID",
-    "META_APP_SECRET",
-    "META_IG_USER_ID",
-    "TIKTOK_CLIENT_KEY",
-    "TIKTOK_CLIENT_SECRET",
-)
+SECRET_ENV = ("META_APP_ID", "META_APP_SECRET", "META_IG_USER_ID")
 
 runner = CliRunner()
 
@@ -43,7 +35,6 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("ACE_CONFIG_DIR", str(config_dir))
     monkeypatch.setenv("ACE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ACE_MEASURE__META_GRAPH_URL", GRAPH)
-    monkeypatch.setenv("ACE_MEASURE__TIKTOK_API_URL", TIKTOK_API)
     monkeypatch.setenv("ACE_HTTP__MAX_RETRIES", "0")
     for name in SECRET_ENV:
         monkeypatch.delenv(name, raising=False)
@@ -79,11 +70,10 @@ def read_post(post_id: int) -> PostRow:
     return post
 
 
-def test_measure_due_without_tokens_skips_both_platforms(cli_env: Path) -> None:
+def test_measure_due_without_a_token_skips_instagram(cli_env: Path) -> None:
     result = runner.invoke(app, ["measure", "due"])
     assert result.exit_code == 0, result.output
     assert "skipping ig_trial: no Meta token, run `ace auth meta`" in result.output
-    assert "skipping tiktok: no TikTok token, run `ace auth tiktok`" in result.output
     assert "matched 0" in result.output
 
 
@@ -122,95 +112,22 @@ def test_measure_due_matches_with_the_meta_reader_and_warns_of_expiry(
     assert (post.status, post.external_id, post.posted_at) == (PostStatus.MATCHED, "1790", posted)
 
 
-@respx.mock
-def test_measure_due_refreshes_an_expired_tiktok_access_token(
-    secrets_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("TIKTOK_CLIENT_KEY", "client-key")
-    monkeypatch.setenv("TIKTOK_CLIENT_SECRET", "client-secret")
-    path = token_path(secrets_dir, Platform.TIKTOK)
-    save_token(
-        StoredToken(
-            access_token="act.old",
-            expires_at=datetime.now(UTC) - timedelta(hours=1),
-            refresh_token="rft.old",
-            refresh_expires_at=datetime.now(UTC) + timedelta(days=300),
-        ),
-        path,
-    )
-    add_awaiting_post(Platform.TIKTOK)
-    refresh = respx.post(f"{TIKTOK_API}/oauth/token/").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "access_token": "act.new",
-                "expires_in": 86400,
-                "refresh_token": "rft.new",
-                "refresh_expires_in": 31536000,
-            },
-        )
-    )
-    listing = respx.post(f"{TIKTOK_API}/video/list/").mock(
-        return_value=httpx.Response(
-            200,
-            json={"data": {"videos": [], "has_more": False}, "error": {"code": "ok"}},
-        )
-    )
-
-    result = runner.invoke(app, ["measure", "due"])
-
-    assert result.exit_code == 0, result.output
-    assert refresh.call_count == 1
-    assert listing.calls.last.request.headers["Authorization"] == "Bearer act.new"
-    saved = load_token(path)
-    assert saved is not None
-    assert (saved.access_token, saved.refresh_token) == ("act.new", "rft.new")
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-
-
-@respx.mock
-def test_measure_due_skips_tiktok_when_the_refresh_fails(
-    secrets_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("TIKTOK_CLIENT_KEY", "client-key")
-    monkeypatch.setenv("TIKTOK_CLIENT_SECRET", "client-secret")
-    save_token(
-        StoredToken(
-            access_token="act.old",
-            expires_at=datetime.now(UTC) - timedelta(hours=1),
-            refresh_token="rft.old",
-        ),
-        token_path(secrets_dir, Platform.TIKTOK),
-    )
-    respx.post(f"{TIKTOK_API}/oauth/token/").mock(
-        return_value=httpx.Response(
-            200, json={"error": "invalid_grant", "error_description": "expired"}
-        )
-    )
-
-    result = runner.invoke(app, ["measure", "due"])
-
-    assert result.exit_code == 0, result.output
-    assert "skipping tiktok: token refresh failed" in result.output
-    assert "invalid_grant" in result.output
-
-
 def test_posts_link_matches_the_post_manually(cli_env: Path) -> None:
-    post_id = add_awaiting_post(Platform.TIKTOK)
+    post_id = add_awaiting_post(Platform.IG_TRIAL)
     render_id = read_post(post_id).render_id
 
     result = runner.invoke(
         app,
-        ["posts", "link", str(render_id), "tiktok", "https://www.tiktok.com/@me/video/7301?x=1"],
+        ["posts", "link", str(render_id), "ig_trial", "https://instagram.com/reel/C9zz?igsh=x"],
     )
 
     assert result.exit_code == 0, result.output
-    assert "https://www.tiktok.com/@me/video/7301" in result.output
+    assert "https://www.instagram.com/reel/C9zz/" in result.output
     post = read_post(post_id)
     assert (post.status, post.match_method, post.external_id) == (
         PostStatus.MATCHED,
         MatchMethod.MANUAL,
-        "7301",
+        "C9zz",
     )
 
 
@@ -256,58 +173,3 @@ def test_auth_meta_exchanges_the_pasted_token_and_saves_it_0600(
     assert saved.access_token == "EAA-long"
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert "META_IG_USER_ID" in result.output
-
-
-def test_auth_tiktok_without_client_credentials_exits_1(cli_env: Path) -> None:
-    result = runner.invoke(app, ["auth", "tiktok"])
-    assert result.exit_code == 1
-    assert "TIKTOK_CLIENT_KEY" in result.output
-
-
-@respx.mock
-def test_auth_tiktok_exchanges_the_code_from_the_pasted_redirect(
-    secrets_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("TIKTOK_CLIENT_KEY", "client-key")
-    monkeypatch.setenv("TIKTOK_CLIENT_SECRET", "client-secret")
-    monkeypatch.setattr("secrets.token_urlsafe", lambda nbytes=None: "fixed-random")
-    route = respx.post(f"{TIKTOK_API}/oauth/token/").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "access_token": "act.1",
-                "expires_in": 86400,
-                "refresh_token": "rft.1",
-                "refresh_expires_in": 31536000,
-            },
-        )
-    )
-    redirect = "http://localhost:8765/callback/?code=the-code&state=fixed-random"
-
-    result = runner.invoke(app, ["auth", "tiktok"], input=redirect + "\n")
-
-    assert result.exit_code == 0, result.output
-    assert "https://www.tiktok.com/v2/auth/authorize/?" in result.output
-    assert "scope=user.info.basic%2Cvideo.list" in result.output
-    form = {k: v[0] for k, v in parse_qs(route.calls.last.request.content.decode()).items()}
-    assert form["code"] == "the-code"
-    assert form["code_verifier"] == "fixed-random"
-    assert form["redirect_uri"] == "http://localhost:8765/callback/"
-    saved = load_token(token_path(secrets_dir, Platform.TIKTOK))
-    assert saved is not None
-    assert saved.refresh_token == "rft.1"
-    assert "act.1" not in result.output
-
-
-def test_auth_tiktok_rejects_a_redirect_from_another_attempt(
-    secrets_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("TIKTOK_CLIENT_KEY", "client-key")
-    monkeypatch.setenv("TIKTOK_CLIENT_SECRET", "client-secret")
-    redirect = "http://localhost:8765/callback/?code=the-code&state=someone-else"
-
-    result = runner.invoke(app, ["auth", "tiktok"], input=redirect + "\n")
-
-    assert result.exit_code == 1
-    assert "state" in result.output
-    assert load_token(token_path(secrets_dir, Platform.TIKTOK)) is None

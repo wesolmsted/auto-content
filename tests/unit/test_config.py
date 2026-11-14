@@ -50,7 +50,7 @@ def test_repo_defaults_load_with_six_distinct_fixed_recipes() -> None:
     assert settings.render.fps == 30
     assert settings.data_dir == Path("data")
     assert len({recipe.id for recipe in settings.recipes.fixed}) == 6
-    assert settings.captions.templates[Platform.TIKTOK] == "{song}"
+    assert settings.captions.templates == {Platform.IG_TRIAL: "{song}"}
     assert settings.anthropic_api_key is None
 
 

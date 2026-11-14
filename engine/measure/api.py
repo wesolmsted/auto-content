@@ -51,7 +51,7 @@ def request_json(
 
 
 def api_error_message(response: httpx.Response) -> str | None:
-    """`error.message` from a Meta or TikTok error body, if there is one."""
+    """`error.message` from a Meta error body, if there is one."""
     try:
         error = response.json().get("error")
     except ValueError:

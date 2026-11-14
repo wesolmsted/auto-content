@@ -28,12 +28,6 @@ class PostStatus(StrEnum):
     NOT_POSTED = "not_posted"
 
 
-class MetricImportStatus(StrEnum):
-    NEW = "new"
-    IMPORTED = "imported"
-    FAILED = "failed"
-
-
 class StyleReferenceStatus(StrEnum):
     NEW = "new"
     DOWNLOADED = "downloaded"
@@ -43,7 +37,6 @@ class StyleReferenceStatus(StrEnum):
 
 class Platform(StrEnum):
     IG_TRIAL = "ig_trial"
-    TIKTOK = "tiktok"
 
 
 class MatchMethod(StrEnum):
@@ -54,12 +47,10 @@ class MatchMethod(StrEnum):
 class MetricCheckpoint(StrEnum):
     H24 = "24h"
     H72 = "72h"
-    EXPORT = "export"
 
 
 class MetricSource(StrEnum):
     API = "api"
-    EXPORT = "export"
 
 
 class Orientation(StrEnum):

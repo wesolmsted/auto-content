@@ -94,7 +94,6 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
     "argv",
     [
         ["ingest", "references"],
-        ["ingest", "exports"],
         ["learn", "update"],
         ["report", "weekly"],
     ],
@@ -104,3 +103,10 @@ def test_unbuilt_commands_exist_and_exit_1(cli_env: Path, argv: list[str]) -> No
     result = runner.invoke(app, argv)
     assert result.exit_code == 1, result.output
     assert "not implemented yet" in result.output
+
+
+@pytest.mark.parametrize("argv", [["auth", "tiktok"], ["ingest", "exports"]], ids=" ".join)
+def test_tiktok_commands_are_gone(cli_env: Path, argv: list[str]) -> None:
+    result = runner.invoke(app, argv)
+    assert result.exit_code == 2
+    assert "No such command" in result.output

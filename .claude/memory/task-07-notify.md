@@ -32,9 +32,9 @@ Slice 7 built phone notifications for ready renders.
   - `Authorization: Bearer <token>` only when `NTFY_TOKEN` is set.
 - A hand-off notification has:
   - title `Hand-off ready: <song> · <cut rate>, <look>` (e.g. "every beat, high contrast");
-  - body `7s for IG Trial + TikTok`;
+  - body `7s for IG Trial`;
   - click URL `HANDOFF_BASE_URL/handoff/<id>`, without a doubled slash;
-  - tags `clapper` plus the target values (`ig_trial`, `tiktok`). ntfy shows tags that aren't emoji names as text.
+  - tags `clapper` plus the target values (`ig_trial`). ntfy shows tags that aren't emoji names as text.
 
 ## Retries and failures
 - Requests go through `engine.http.request_with_retries`: 429, 5xx and transport errors are retried with backoff; 4xx fails at once.

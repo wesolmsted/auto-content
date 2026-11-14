@@ -11,12 +11,13 @@
 | D1 | Runtime | **Local first, cloud-ready** | Runs on the Mac via launchd. All paths, credentials and storage go through config, and the app ships with a Dockerfile, so it can move to a scheduled cloud job without code changes. |
 | D2 | Review UI | **Minimal hand-off web page** | FastAPI + server-rendered HTML. Reached from the phone over Tailscale (no public exposure). |
 | D3 | Drive auth | **OAuth on the owner's Google account** | One-time browser consent, refresh token stored in the secrets dir. Scope: `drive`. |
-| D8 | Posting | **Manual hand-off for every platform; the system never posts** | When a render is ready, the owner gets a phone notification. The hand-off page has the video and captions; the owner saves the video and posts it from the Instagram (as a Trial Reel) or TikTok app. No platform posting API is used. Supersedes D4/D4b. |
+| D8 | Posting | **Manual hand-off; the system never posts** | When a render is ready, the owner gets a phone notification. The hand-off page has the video and caption; the owner saves the video and posts it from the Instagram app as a Trial Reel. No platform posting API is used. Supersedes D4/D4b. |
 | D9 | Approval | **Downloading the video = approval** | There is no separate approve step. A download from the hand-off page moves the render to `approved`. |
 | D10 | Phone notifications | **ntfy** (default; behind `Notifier`) | One HTTP POST per hand-off with a tap-through link. Swappable for Pushover/Telegram. |
 | D5 | Language | Python 3.12 | Best fit for FFmpeg, librosa, PySceneDetect, OpenCV. |
 | D6 | Database | SQLite via SQLAlchemy 2.0 + Alembic | Single file locally; same models move to Postgres in the cloud. |
 | D7 | Orchestration | DB-driven idempotent jobs, triggered by CLI commands on a schedule | No queue broker. Each run picks up whatever work the DB says is due. |
+| D11 | Platforms | **Instagram Trial Reels only** | Every render targets `ig_trial`, and only the Meta Graph API is read. The platform plumbing (`Platform` enum, per-target captions and posts, `PlatformReader`, scores keyed by platform) stays, with one value. |
 
 New decisions get appended to the decision log in §13.
 
@@ -26,7 +27,7 @@ New decisions get appended to the decision log in §13.
 
 1. **The database is the source of truth for pipeline state.** Every unit of work (a footage file, a render, a post, a metric checkpoint) has a row with a `status`. Jobs query for rows in a given state, do the work, and advance the state. A crash mid-run loses nothing; the next run resumes.
 2. **Every job is idempotent and re-runnable.** Running `ace ingest` twice in a row does nothing the second time. Dedup keys are explicit (Drive `fileId` + `md5Checksum`, recipe param hash, etc.).
-3. **Pure core, thin edges.** Decisions (shot selection, beat-grid cutting, post matching, bandit sampling, scoring) are pure functions over plain data and are unit-tested without I/O. External systems (Drive, vision API, FFmpeg, notifications, Meta, TikTok) sit behind small interfaces with fakes for tests.
+3. **Pure core, thin edges.** Decisions (shot selection, beat-grid cutting, post matching, bandit sampling, scoring) are pure functions over plain data and are unit-tested without I/O. External systems (Drive, vision API, FFmpeg, notifications, Meta) sit behind small interfaces with fakes for tests.
 4. **Plan, then execute.** Rendering is split into building a `Timeline` (pure data: which shot, which in/out points, which effects, at which output times) and executing it with FFmpeg. The timeline is stored with the render, so any video can be explained and reproduced.
 5. **One failure doesn't block the batch.** Per-item errors are recorded on the row (`error`, `attempts`) and the job moves on. Items past `max_attempts` go to `failed` and show up in the report.
 6. **The system never posts.** No code calls a platform's publish, upload or draft endpoint. Platform APIs are used **read-only**, for metrics. Every post goes live only when the owner publishes it from the platform's app. This is a hard rule: don't add a posting client, even behind a flag.
@@ -58,9 +59,8 @@ flowchart TB
     WEB --> FS
     GEN --> NTFY[ntfy → phone]
     PHONE([Owner's phone]) -->|Tailscale| WEB
-    PHONE -->|posts manually| APPS[Instagram / TikTok apps]
+    PHONE -->|posts manually| APPS[Instagram app]
     MEA -->|read-only| META[Meta Graph API]
-    MEA -->|read-only| TT[TikTok Display API]
 ```
 
 Two long-lived processes at most: the scheduler (launchd locally, cron/cloud scheduler later) that invokes CLI jobs, and `ace serve` for the hand-off page. Everything else is a short-lived command.
@@ -71,7 +71,6 @@ Two long-lived processes at most: the scheduler (launchd locally, cron/cloud sch
 | --- | --- | --- |
 | `ace ingest footage` | every 30 min | Poll, download, split, tag. |
 | `ace ingest references` | every 30 min | Phase 3. |
-| `ace ingest exports` | daily | Imports TikTok Studio export files from Drive (§7.6). |
 | `ace render batch` | daily, 06:00 | Renders N candidates (config: `cadence.renders_per_day`, default 4). Their notifications are held until the 4–7 pm ET posting window (§7.5). |
 | `ace notify pending` | every 15 min, 16:00–19:00 ET | Sends the held hand-off notifications. Morning batch renders only notify on a run inside the window. |
 | `ace measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
@@ -90,7 +89,7 @@ auto-content/
 ├── CLAUDE.md                  # instructions for coding sessions
 ├── docs/
 │   ├── DESIGN.md              # this document
-│   └── runbooks/              # setup: Google OAuth, Meta app (read-only), TikTok app (read-only), ntfy, Tailscale
+│   └── runbooks/              # setup: Google OAuth, Meta app (read-only), ntfy, Tailscale
 ├── pyproject.toml             # deps, ruff, mypy, pytest config; `ace` console script
 ├── uv.lock
 ├── Dockerfile                 # cloud-ready image (python + ffmpeg)
@@ -116,7 +115,7 @@ auto-content/
 │   ├── references/            # reference analysis → style card → recipe + notes
 │   ├── handoff/               # FastAPI hand-off app, templates, download = approval
 │   ├── notify/                # Notifier interface + ntfy implementation
-│   ├── measure/               # PlatformReader interface (Meta, TikTok), post matching, metric pulls
+│   ├── measure/               # PlatformReader interface (Meta), post matching, metric pulls
 │   └── learn/                 # scoring, Thompson sampling, report, shoot list
 ├── data/                      # gitignored: sqlite db, media store, secrets
 ├── scripts/                   # one-off dev helpers only (jobs belong in the CLI)
@@ -129,7 +128,7 @@ auto-content/
 
 Dependency direction: `cli` → feature modules (`ingest`, `recipes`, …) → shared infrastructure (`db`, `storage`, `drive`, `vision`, `notify`, `config`). Feature modules don't import each other's internals; they communicate through the DB and the per-module contract models (`engine/<module>/models.py`).
 
-Each module owns its CLI commands in `engine/<module>/cli.py`, which `engine/cli.py` mounts. `ace auth google` lives in `drive/cli.py`, `ace auth meta|tiktok` and `ace posts link` in `measure/cli.py`, and `ace report weekly` in `learn/cli.py`.
+Each module owns its CLI commands in `engine/<module>/cli.py`, which `engine/cli.py` mounts. `ace auth google` lives in `drive/cli.py`, `ace auth meta` and `ace posts link` in `measure/cli.py`, and `ace report weekly` in `learn/cli.py`.
 
 ---
 
@@ -141,9 +140,9 @@ Refinements over the README's first pass:
 - Songs and snippets are split, so a song's audio is analyzed once and snippets are ranges on it.
 - Every processed item carries `status`, `error`, `attempts`, `updated_at` for the job pattern in §2.
 - Recipes are identified by a **hash of their canonical params**, so the same style choices always map to the same recipe row.
-- A render has **target platforms** and a caption per target. A `posts` row per target is created at approval (download) and later **matched** to the video the owner actually posted.
+- A render has **target platforms** (only `ig_trial`, D11) and a caption per target. A `posts` row per target is created at approval (download) and later **matched** to the video the owner actually posted.
 - Metrics keep the raw API payload, so new signals can be derived later without re-fetching.
-- Variable scores are keyed by platform, since IG and TikTok signals differ.
+- Variable scores are keyed by platform (`ig_trial`, plus `internal` for the taste prior).
 
 ```
 footage_files
@@ -174,7 +173,7 @@ recipes
 
 renders
   id PK, recipe_id FK, snippet_id FK, timeline_json, shot_ids_json,
-  file_path, duration_s, targets_json,                  -- e.g. ["ig_trial"] or ["ig_trial","tiktok"]
+  file_path, duration_s, targets_json,                  -- ["ig_trial"]
   captions_json,                                        -- {platform: caption}
   status [rendering|ready|approved|rejected|superseded|failed],
   notified_at, downloaded_at, download_count,
@@ -182,22 +181,17 @@ renders
   ffmpeg_argv_json, error, attempts, created_at, updated_at
 
 posts
-  id PK, render_id FK, platform [ig_trial|tiktok],
+  id PK, render_id FK, platform [ig_trial],
   status [awaiting_post|matched|not_posted],
   external_id NULL, permalink NULL, posted_at NULL,
   match_method [auto|manual] NULL, match_score REAL NULL,
   created_at, updated_at, UNIQUE(render_id, platform)
 
 metrics
-  id PK, post_id FK, checkpoint [24h|72h|export], source [api|export], fetched_at,
+  id PK, post_id FK, checkpoint [24h|72h], source [api], fetched_at,
   views, reach, likes, comments, shares, saves,
   avg_watch_s, full_watch_rate, skip_rate, raw_json,
-  UNIQUE(post_id, checkpoint)                           -- the `export` row is overwritten by each newer export
-
-metric_imports                                          -- TikTok Studio export files (§7.6)
-  id PK, drive_file_id UNIQUE, md5, name, platform,
-  status [new|imported|failed], rows_total, rows_matched, rows_unmatched,
-  error, created_at
+  UNIQUE(post_id, checkpoint)
 
 variable_scores
   variable, value, platform, alpha REAL, beta REAL, n_posts INT, updated_at,
@@ -321,7 +315,7 @@ Vision tag vocabulary (`category`, `lighting`, etc.) is a closed enum defined in
   - `one_long_shot` chains the longest shots, longest first, and cuts on the last beat the current shot still covers (plus the drop cut). It ignores `opening_shot`.
   - `ace render one` passes `ignore_limits=True`, skipping the weekly repeat cap and the shot cooldown. `ace render batch` exits 1 if any render failed.
 - Both functions are pure and deterministic given a seeded `rng`. These are the most heavily unit-tested functions in the codebase.
-- **Targets:** every render targets `ig_trial`. It also targets `tiktok` when its recipe is proven on IG (Phase 2) or when config forces it (`cadence.tiktok_every_render`, default false). In Phase 1, one render a day also targets TikTok.
+- **Targets:** every render targets `ig_trial` (D11).
 
 Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and a landscape version (`footage_orientation`). Landscape shots are center-cropped to 9:16. Phase 2 replaces fixed recipes with sampling (§7.7).
 
@@ -331,12 +325,12 @@ Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and 
 - As built:
   - Effects are applied after concat, keyed to output time.
   - `execute_plan` retries inside one call, up to `render.max_attempts`, so a render row always ends in `ready` or `failed`.
-  - The bundled default font is Anton (SIL OFL 1.1). The native-text task adds TikTok Sans.
+  - The bundled default font is Anton (SIL OFL 1.1).
   - Text needs an ffmpeg build with `drawtext` (libfreetype). The Homebrew `ffmpeg` formula doesn't include it; `ffmpeg-full` does, and the Docker/Debian image does.
 - Output validated with `ffprobe` (duration within ±1 frame of plan, 9:16, has audio).
 - Captions per target, templated from config for v1 (open question in §14).
 - **Native-looking text** (follow-up task after slice 6): burned-in text should look like text added in the app.
-  - **Fonts:** bundle **TikTok Sans** (TikTok's own app font, open source under SIL OFL 1.1). Instagram's in-app font (Instagram Sans) isn't openly licensed, so the IG preset uses the closest OFL match, and the owner can drop their own font file into `data_dir/fonts/` and point the preset at it.
+  - **Fonts:** Instagram's in-app font (Instagram Sans) isn't openly licensed, so the preset uses the closest OFL match, and the owner can drop their own font file into `data_dir/fonts/` and point the preset at it.
   - **Styles:** presets copy the in-app looks: plain white with a soft shadow, outline, and a rounded background box (white box with black text, or black with white). Text sits inside the platform safe zones, clear of the caption and button overlays.
   - **Text source:** `ace snippets add --text "<hook lyric>"` stores the hook text on the snippet, and recipes with `on_screen_text = hook_lyric` use it.
 - On success: status → `ready`, then send the hand-off notification (§7.5). If the notification fails, the render stays `ready` with `notified_at` NULL, and the next run retries the notification.
@@ -350,7 +344,7 @@ Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and 
 - `/handoff/{render_id}` shows:
   - a video preview, served from `/handoff/{id}/preview` (HTTP Range support for scrubbing). **Previewing is not approval.**
   - a **Save video** button.
-  - one card per target platform, with its caption and a **Copy caption** button, plus short posting reminders (IG: turn on *Trial*; TikTok: add the official sound if it's a song-driving post).
+  - one card per target platform, with its caption and a **Copy caption** button, plus a short posting reminder (turn on *Trial*).
   - a **Reject** button with reason chips (`off_brand`, `bad_shot`, `bad_timing`, `bad_text`, `boring`, `other`) + optional note.
   - after approval, a **Link post** field to paste the post URL if auto-matching misses it (§7.6).
 - **Download = approval.** *Save video* calls `/handoff/{id}/download`. The server records `downloaded_at`, increments `download_count`, moves the render `ready → approved` (only on the first download) and creates one `posts` row per target in `awaiting_post`, all in one transaction. Then it returns the file. On phones that support the Web Share API with files (iOS Safari), the page fetches that endpoint and opens the share sheet, so *Save Video* puts it straight into Photos. Otherwise it's a plain `Content-Disposition: attachment` link. Repeat downloads are allowed and don't create duplicate posts.
@@ -360,12 +354,10 @@ Phase 1 ships **6 fixed recipes** from config: 3 styles, each in a portrait and 
 
 ### 7.6 Post matching and metrics (Phase 1)
 
-Since the owner posts by hand, the system has to find each post on the platform and link it back to its render. All platform calls are read-only.
+Since the owner posts by hand, the system has to find each post on the platform and link it back to its render. All platform calls are read-only, with no scraping or browser automation.
 
 **Platform readers**
 - **Instagram** (Meta Graph API, Instagram Business/Creator account). `GET /{ig-user-id}/media` with fields `id, permalink, timestamp, caption, media_type, media_product_type`, and per-media insights (`views`, `reach`, `saved`, `shares`, `ig_reels_avg_watch_time`, `reels_skip_rate`). Read scopes only (insights + basic). Long-lived token refresh is a scheduled check; the job fails loudly a week before expiry. *To verify in setup:* trial reels appear in the media list with insights before graduation (see §14).
-- **TikTok** (Display API via the owner's own developer app, Login Kit, scopes `user.info.basic` + `video.list`). `POST /v2/video/list/` returns `id, create_time, video_description, duration, share_url` plus `view_count, like_count, comment_count, share_count`. No watch-time or retention data. Reading needs no posting audit. *To verify in setup:* the app can be approved, or used in sandbox, for the owner's own account (see §14). The Display API is used for matching and for the 24 h / 72 h count checkpoints.
-- **TikTok watch time: weekly TikTok Studio export.** Once a week the owner downloads the per-post analytics export from TikTok Studio (desktop) and drops it in a Drive folder (`Content Engine / TikTok Exports / Inbox`). `ace ingest exports` reuses the Drive poller (same `fileId` + `md5` dedup, moved to `Processed` after import), parses the file and joins each row to a matched TikTok post by video ID/link. If the export has no ID column, it falls back to post date + caption text against matched posts. Each joined row upserts that post's `export` metrics row (`avg_watch_s`, `full_watch_rate`, plus the counts). Rows that don't join are counted on `metric_imports.rows_unmatched` and listed in the weekly report. No scraping or browser automation of TikTok or Instagram.
 
 As built:
 - Instagram's media API returns no duration, so the duration filter is skipped for IG candidates.
@@ -394,8 +386,6 @@ As built:
   | `cut_rate`, `length_s`, `footage_category`, `footage_orientation`, `look`, `effects`, `on_screen_text` | avg watch time ÷ length |
   | tie-breaker | (shares + saves) / reach |
 
-  TikTok posts update the `tiktok` platform rows against a TikTok-only baseline. They're scored on avg watch time ÷ length from the latest `export` row once one exists, and on shares / views from the API checkpoints until then. Because exports arrive weekly, TikTok scores lag about a week behind IG.
-
 - **Batch generation:** for each render slot, with probability 0.8 build a recipe by Thompson-sampling each variable independently from its posterior (exploit); with 0.2 pick uniformly (explore). The taste prior multiplies in as a soft weight (a reject-heavy value is down-weighted, not banned). Reference recipes enter as whole recipes in the explore share.
 - A value is "settled" when `n_posts >= 8` and the posterior's 90% interval excludes the baseline.
 - Guardrail: no recipe hash rendered more than `recipes.max_repeats_per_week` (default 3).
@@ -418,7 +408,6 @@ Reuses the Drive poller with the references folder. Measurement (scene cuts, bea
 - Secrets, env only (`.env` locally, secret manager in the cloud):
   - `GOOGLE_OAUTH_CLIENT_JSON`, `ANTHROPIC_API_KEY`;
   - `META_APP_ID`, `META_APP_SECRET`, `META_IG_USER_ID`;
-  - `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`;
   - `NTFY_SERVER` (default `https://ntfy.sh`), `NTFY_TOPIC`, `NTFY_TOKEN` (optional);
   - `HANDOFF_BASE_URL` (Tailscale URL), `HANDOFF_TOKEN`.
 
@@ -454,8 +443,8 @@ Kept true from day one so a move is a deploy, not a refactor:
 
 ```
 ace init                        # create data dirs, run migrations, check ffmpeg
-ace auth google | meta | tiktok # one-time OAuth flows (meta/tiktok are read-only scopes)
-ace ingest footage | references | exports
+ace auth google | meta          # one-time auth flows (meta is read-only scopes)
+ace ingest footage | references
 ace snippets add <audio> --start S --end S --type hook|drop|intro_build
 ace snippets list
 ace render batch [--n N] [--recipe ID] [--snippet ID] [--dry-run]   # dry-run prints timelines, no notifications
@@ -478,10 +467,10 @@ ace status                      # counts per table/status, recent failures
 | --- | --- | --- |
 | Unit | beat grid → cut points, drop snapping, shot selection, `assemble`, render/post state transitions, `match_posts`, bandit sampling and updates, reward computation, recipe hashing | Pure functions; seeded RNG; property tests (Hypothesis) for timeline invariants: total duration = target, every cut on the grid (any beat for `one_long_shot`), no shot reused within a video, a cut at the drop when required |
 | Integration | scene split, FFmpeg render, ffprobe validation, DB repositories, migrations, hand-off endpoints (download → approval exactly once, preview ≠ approval, 409 on rejected) | Real ffmpeg + temp SQLite against tiny fixtures; FastAPI `TestClient` |
-| Contract | Drive, vision, ntfy, Meta, TikTok clients | Recorded responses (respx/vcrpy); fakes implement the same Protocols |
+| Contract | Drive, vision, ntfy, Meta clients | Recorded responses (respx/vcrpy); fakes implement the same Protocols |
 | End-to-end (local) | `ingest → render → notify → download → measure (match + metrics)` | One test against fakes, run in CI |
 
-A guard test asserts that no module under `engine/` imports or calls a known publish endpoint (Meta `media_publish` / `/media` POST, TikTok `/post/publish/`), enforcing principle 6.
+A guard test asserts that no module under `engine/` imports or calls a known publish endpoint (Meta `media_publish` / `/media` POST), enforcing principle 6.
 
 Fixtures are **generated, not committed binaries**: a `tests/fixtures/make_fixtures.py` builds a few short clips with ffmpeg `lavfi` (color bars, moving test patterns, hard scene changes) and a click track at a known BPM, so beat and scene detection have ground truth.
 
@@ -503,10 +492,8 @@ Each slice ends with something runnable and tested.
 6. **Render**: FFmpeg pipeline, LUTs, text, validation.
 7. **Notify**: `Notifier` + ntfy, quiet hours, retry of unsent notifications, `ace notify test`.
 8. **Hand-off page**: `ace serve`, preview, save/share, download = approval, reject, expiry, Tailscale runbook.
-9. **Platform readers**: Meta + TikTok read-only auth, `recent_videos`, `match_posts`, manual link.
+9. **Platform readers**: Meta read-only auth, `recent_videos`, `match_posts`, manual link.
 10. **Measure**: 24 h / 72 h metric pulls.
-
-Phase 2 starts with **TikTok export import** (`ace ingest exports`, `metric_imports`, join to posts), since it only matters once learning uses TikTok watch time.
 
 Phases 2–4 follow the README roadmap; each gets broken into slices here before work starts. Build order follows the prototype-first rule: get each slice working end to end before adding refinements, and add a refinement only when real usage shows the simpler version falls short.
 
@@ -532,7 +519,8 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | 2026-11-09 | — | Hand-off expiry counts from `notified_at`; unnotified renders never expire | Notifications are held for quiet hours, so counting from `created_at` shortened the owner's real window by up to ~10 h. |
 | 2026-11-09 | — | Snippet start snaps to the nearest downbeat | First real run: every video started mid-beat, with the first cut 0.3–0.4 s in. |
 | 2026-11-09 | — | `footage_orientation` (portrait · landscape) is a recipe variable; a render never mixes orientations | First real run: landscape music-video shots center-cropped to 9:16 lose content and look different from portrait phone footage. Making it a variable keeps renders consistent and lets the learning loop measure whether cropped landscape footage performs. |
-| 2026-11-08 | — | TikTok watch time from a weekly TikTok Studio export, not browser scraping | Scraping logged-in pages breaks both platforms' terms and risks the account; the export is first-party data for about 2 minutes of owner effort a week. |
+| 2026-11-08 | — | ~~TikTok watch time from a weekly TikTok Studio export~~ | Superseded by D11. |
+| 2026-11-14 | D11 | Instagram Trial Reels only; TikTok removed | Owner decision to cut scope. Removed: the TikTok reader and `ace auth tiktok`, TikTok link parsing, the TikTok cadence and caption config, the TikTok Studio export import (`ace ingest exports`, `metric_imports`, the `export` metric checkpoint/source). Migration 0002 drops `metric_imports` and deletes TikTok rows. The multi-platform plumbing stays so a platform can be added back. |
 
 ---
 
@@ -542,12 +530,9 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | --- | --- |
 | Notification service: ntfy, Pushover or Telegram? | ntfy (D10); swappable behind `Notifier`. |
 | Do trial reels appear in `GET /{ig-user-id}/media` with insights before graduation? | Verify in slice 9. If not, fall back to manual links + insights by media id, and recheck after graduation. |
-| Can the owner's own TikTok app read `video.list` for their account without full app review (sandbox)? | Verify in slice 9. If not, submit the app for read-only review; until then, match TikTok posts manually (Link post) and score them from the weekly export only. |
-| What exactly does the TikTok Studio export contain (per-post rows? video ID or link? avg watch time and full-watch %? file format)? | Get a sample export before building the importer; write the parser's tests against it, with personal data scrubbed. |
 | Is the match rate good enough without frame fingerprints? | Track the auto-match rate in `ace status` and the weekly report; revisit if manual links are frequent. |
 | Captions and hashtags: templated or generated per post? | Templated per song from config. |
 | Rejection reasons: hard filter or prior? | Soft prior (§7.7). |
 | Where does song audio come from? | Local file passed to `snippets add`. |
-| Which renders also target TikTok in Phase 1? | One render per day (config); Phase 2 switches to proven recipes. |
 | Face-aware 9:16 reframing? | Center crop in Phase 1; revisit if rejections cite framing. |
 | Closest openly licensed match for Instagram's in-app text font? | Compare candidates (e.g. Instrument Sans) side by side against an in-app screenshot during the native-text task; the owner can supply their own font file. |

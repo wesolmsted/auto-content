@@ -19,7 +19,7 @@ type: project
 - Done: Google OAuth (Desktop client, token in `data/secrets/`), Drive footage Inbox/Processed ids in `config/local.toml`, `ANTHROPIC_API_KEY`, ntfy topic (app subscription verified), `ffmpeg-full`.
 - `HANDOFF_BASE_URL` is `http://127.0.0.1:8000` (Mac only); Tailscale isn't set up, so notification links don't open on the phone yet.
 - Song audio lives in `~/.config/auto-content/audio/`; the Google client JSON is outside the repo too.
-- Meta/TikTok developer apps: not started.
+- Meta developer app: not started. (TikTok was dropped from scope on 2026-11-14, DESIGN D11; `.env` can lose its empty `TIKTOK_*` lines.)
 - Step-by-step setup guide (Claude doc): https://claude.ai/artifact/UhXZwgqQrk7g2Vr8RyEXLx
 - Local DB: renders 1–4 (mixed orientation, before task 12) and 5 (landscape only) are `ready`, all notified; none downloaded yet.
 - To test notifications outside 16:00–19:00 ET, set `ACE_NOTIFY__QUIET_HOURS__START=00:00:00` and `ACE_NOTIFY__QUIET_HOURS__END=00:00:00`.
@@ -36,4 +36,4 @@ type: project
 2. Shared-file follow-ups: add `tzdata`; add `engine/render/fonts/*` to package data; resolve `luts_dir`/`font_file` against the config dir; bump `measure.meta_graph_url` after checking the real account.
 3. Native-looking text (DESIGN §7.4).
 4. launchd schedule (DESIGN §3).
-5. Meta/TikTok developer apps, then measure; then Phase 2.
+5. Meta developer app, then measure; then Phase 2.

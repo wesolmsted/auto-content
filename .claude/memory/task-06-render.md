@@ -37,7 +37,7 @@ Slice 6 built FFmpeg rendering (`engine/render/`). `ace render` CLI wiring and n
   - Options: `expansion=none` (so `%` is literal), x centered.
   - y: top `h*0.12`, center `(h-text_h)/2`, lower_third `h*0.70-text_h/2`.
   - Case is applied in Python. `enable='between(t,start,end)'`.
-  - No line wrapping: long text runs off the frame edges. Left for the text-style follow-up (TikTok Sans, presets, safe zones), which should extend `TextRenderStyle`.
+  - No line wrapping: long text runs off the frame edges. Left for the text-style follow-up (fonts, presets, safe zones), which should extend `TextRenderStyle`.
 
 ## Encode
 `-c:v libx264 -profile:v high -crf 20 -preset medium -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart -t <duration>`, all from `RenderSettings`. With `-preset ultrafast` (used in tests), x264 reports Constrained Baseline even with `-profile:v high`. That's harmless.

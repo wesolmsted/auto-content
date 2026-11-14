@@ -25,9 +25,7 @@ def settings() -> Settings:
             "font_file": REPO_ROOT / "engine" / "render" / "fonts" / "Anton-Regular.ttf",
         }
     )
-    captions = CaptionSettings(
-        templates={Platform.IG_TRIAL: "{song} 🌃", Platform.TIKTOK: "{song} #fyp"}
-    )
+    captions = CaptionSettings(templates={Platform.IG_TRIAL: "{song} 🌃"})
     return settings.model_copy(update={"render": render, "captions": captions})
 
 
@@ -62,7 +60,7 @@ def make_plan(snippet_id: int, source: Path) -> RenderPlan:
         recipe_id="rcp_000000000001",
         snippet_id=snippet_id,
         timeline=timeline,
-        targets=(Platform.IG_TRIAL, Platform.TIKTOK),
+        targets=(Platform.IG_TRIAL,),
         captions={},
     )
 
@@ -92,8 +90,8 @@ def test_a_successful_render_is_stored_ready_with_everything_needed_to_reproduce
     assert row.shot_ids_json == [7]
     assert row.ffmpeg_argv_json[0] == "ffmpeg"
     assert row.ffmpeg_argv_json[-1] == row.file_path
-    assert row.targets_json == ["ig_trial", "tiktok"]
-    assert row.captions_json == {"ig_trial": "Night Drive 🌃", "tiktok": "Night Drive #fyp"}
+    assert row.targets_json == ["ig_trial"]
+    assert row.captions_json == {"ig_trial": "Night Drive 🌃"}
 
 
 def test_a_render_that_keeps_failing_is_retried_then_marked_failed(

@@ -26,7 +26,6 @@ app = typer.Typer(help="Auto Content Engine.", no_args_is_help=True)
 auth_app = typer.Typer(help="One-time authorization flows.", no_args_is_help=True)
 auth_app.command("google")(drive_cli.auth_google)
 auth_app.command("meta")(measure_cli.auth_meta)
-auth_app.command("tiktok")(measure_cli.auth_tiktok)
 
 app.add_typer(auth_app, name="auth")
 app.add_typer(ingest_cli.app, name="ingest")

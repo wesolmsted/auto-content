@@ -157,11 +157,11 @@ def test_an_unmatched_post_becomes_not_posted_only_after_the_window(db_session: 
 
 def test_posts_on_a_platform_without_a_reader_are_left_alone(db_session: Session) -> None:
     window = timedelta(hours=SETTINGS.match.window_hours)
-    tiktok = add_post(db_session, platform=Platform.TIKTOK, downloaded_at=NOW - 2 * window)
+    post = add_post(db_session, downloaded_at=NOW - 2 * window)
 
-    run_measure(db_session, [FakePlatformReader(Platform.IG_TRIAL)], SETTINGS, NOW)
+    run_measure(db_session, [], SETTINGS, NOW)
 
-    assert tiktok.status == PostStatus.AWAITING_POST
+    assert post.status == PostStatus.AWAITING_POST
 
 
 def test_a_listing_failure_is_recorded_and_keeps_posts_awaiting(db_session: Session) -> None:
@@ -335,18 +335,6 @@ def test_link_post_stores_the_reel_code_and_canonical_link_like_the_handoff_page
     assert post.posted_at is None
 
 
-def test_link_post_for_tiktok_stores_the_video_id(db_session: Session) -> None:
-    post = add_post(db_session, platform=Platform.TIKTOK)
-    url = "https://www.tiktok.com/@owner/video/7300000000000000001?is_from_webapp=1"
-
-    link_post(db_session, post.render_id, Platform.TIKTOK, url)
-
-    assert (post.status, post.match_method) == (PostStatus.MATCHED, MatchMethod.MANUAL)
-    assert post.external_id == "7300000000000000001"
-    assert post.permalink == "https://www.tiktok.com/@owner/video/7300000000000000001"
-    assert post.posted_at is None
-
-
 def test_relinking_a_matched_post_replaces_the_auto_match(db_session: Session) -> None:
     post = add_post(db_session, status=PostStatus.MATCHED, external_id="1790", posted_at=DOWNLOADED)
     post.match_score = 0.8
@@ -361,46 +349,42 @@ def test_link_post_without_a_post_row_says_to_download_first(db_session: Session
         link_post(
             db_session,
             render.id,
-            Platform.TIKTOK,
-            "https://www.tiktok.com/@owner/video/7300000000000000001",
+            Platform.IG_TRIAL,
+            "https://www.instagram.com/reel/C9zz/",
         )
 
 
 @pytest.mark.parametrize(
     ("existing_id", "existing_permalink"),
     [
-        ("7301", None),
-        ("7301000", "https://www.tiktok.com/@owner/video/7301"),
+        ("C9zz", None),
+        ("1790", "https://www.instagram.com/reel/C9zz/"),
     ],
 )
 def test_link_post_refuses_a_video_already_linked_to_another_post(
     db_session: Session, existing_id: str, existing_permalink: str | None
 ) -> None:
-    other = add_post(
-        db_session, platform=Platform.TIKTOK, status=PostStatus.MATCHED, external_id=existing_id
-    )
+    other = add_post(db_session, status=PostStatus.MATCHED, external_id=existing_id)
     other.permalink = existing_permalink
-    post = add_post(db_session, caption="Other", platform=Platform.TIKTOK)
+    post = add_post(db_session, caption="Other")
     with pytest.raises(LinkError, match="already linked"):
         link_post(
-            db_session, post.render_id, Platform.TIKTOK, "https://www.tiktok.com/@owner/video/7301"
+            db_session, post.render_id, Platform.IG_TRIAL, "https://www.instagram.com/reel/C9zz/"
         )
     assert post.status == PostStatus.AWAITING_POST
 
 
 def test_link_post_rejects_an_unreadable_link(db_session: Session) -> None:
-    post = add_post(db_session, platform=Platform.TIKTOK)
+    post = add_post(db_session)
     with pytest.raises(LinkError, match="link"):
-        link_post(db_session, post.render_id, Platform.TIKTOK, "https://vm.tiktok.com/ZMabc/")
+        link_post(
+            db_session, post.render_id, Platform.IG_TRIAL, "https://www.instagram.com/p/C9zz/"
+        )
 
 
-def add_manual_post(
-    session: Session, external_id: str, permalink: str, platform: Platform = Platform.IG_TRIAL
-) -> PostRow:
+def add_manual_post(session: Session, external_id: str, permalink: str) -> PostRow:
     """A post as the hand-off page's Link post form leaves it: matched, no posting time."""
-    post = add_post(
-        session, caption=f"manual {external_id}", platform=platform, status=PostStatus.MATCHED
-    )
+    post = add_post(session, caption=f"manual {external_id}", status=PostStatus.MATCHED)
     post.match_method = MatchMethod.MANUAL
     post.external_id = external_id
     post.permalink = permalink
@@ -427,24 +411,6 @@ def test_a_manual_instagram_link_is_resolved_to_the_media_id_and_posting_time(
     assert reader.listed_since == [DOWNLOADED - timedelta(hours=SETTINGS.match.fetch_slack_hours)]
     assert reader.fetched == ["1790"]
     assert [row.checkpoint for row in metric_rows(db_session)] == [MetricCheckpoint.H24]
-
-
-def test_a_manual_tiktok_link_gets_its_posting_time(db_session: Session) -> None:
-    post = add_manual_post(
-        db_session,
-        "7300000000000000001",
-        "https://www.tiktok.com/@owner/video/7300000000000000001",
-        platform=Platform.TIKTOK,
-    )
-    posted = DOWNLOADED + timedelta(hours=2)
-    reader = FakePlatformReader(
-        Platform.TIKTOK,
-        [ig_video("7300000000000000001", posted, platform=Platform.TIKTOK, duration_s=7.0)],
-    )
-
-    run_measure(db_session, [reader], SETTINGS, NOW)
-
-    assert (post.external_id, post.posted_at) == ("7300000000000000001", posted)
 
 
 def test_a_resolved_manual_video_is_not_auto_matched_to_another_post(db_session: Session) -> None:

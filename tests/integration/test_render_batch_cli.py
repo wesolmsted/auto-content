@@ -109,7 +109,7 @@ def test_dry_run_prints_each_planned_timeline_and_writes_nothing() -> None:
         )
         assert match, line
         assert match[1] in fixed_ids
-    assert "targets=ig_trial,tiktok" in plans[0]
+    assert all("targets=ig_trial " in line for line in plans)
     assert len(re.findall(r"^  cuts: \d+\.\d\d( \d+\.\d\d)*$", result.output, re.M)) == 2
     assert len(re.findall(r"^  shots: \d+( \d+)*$", result.output, re.M)) == 2
     assert count(RenderRow) == 0

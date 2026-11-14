@@ -72,7 +72,7 @@ def notified_at_by_id(session: Session) -> dict[int, datetime | None]:
 def test_sends_one_notification_per_ready_unnotified_render_and_marks_it(
     db_session: Session,
 ) -> None:
-    render = add_render(db_session, targets=(Platform.IG_TRIAL, Platform.TIKTOK))
+    render = add_render(db_session, targets=(Platform.IG_TRIAL,))
     notifier = FakeNotifier()
 
     sent = send_pending_handoff_notifications(db_session, notifier, make_settings(), NOON_UTC)
@@ -81,9 +81,9 @@ def test_sends_one_notification_per_ready_unnotified_render_and_marks_it(
     assert notifier.sent == [
         Notification(
             title="Hand-off ready: Night Drive · every beat, high contrast",
-            body="7s for IG Trial + TikTok",
+            body="7s for IG Trial",
             click_url=f"https://mac.tailnet.test/handoff/{render.id}",
-            tags=("clapper", "ig_trial", "tiktok"),
+            tags=("clapper", "ig_trial"),
         )
     ]
     assert notified_at_by_id(db_session) == {render.id: NOON_UTC}

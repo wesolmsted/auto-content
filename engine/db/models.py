@@ -13,7 +13,6 @@ from engine.db.enums import (
     FootageStatus,
     MatchMethod,
     MetricCheckpoint,
-    MetricImportStatus,
     MetricSource,
     Orientation,
     Platform,
@@ -187,24 +186,6 @@ class MetricRow(Base):
     full_watch_rate: Mapped[float | None]
     skip_rate: Mapped[float | None]
     raw_json: Mapped[dict[str, Any]] = mapped_column(default=dict)
-
-
-class MetricImportRow(Base):
-    __tablename__ = "metric_imports"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    drive_file_id: Mapped[str] = mapped_column(unique=True)
-    md5: Mapped[str | None]
-    name: Mapped[str]
-    platform: Mapped[Platform] = mapped_column(StrEnumType(Platform))
-    status: Mapped[MetricImportStatus] = mapped_column(
-        StrEnumType(MetricImportStatus), default=MetricImportStatus.NEW, index=True
-    )
-    rows_total: Mapped[int | None]
-    rows_matched: Mapped[int | None]
-    rows_unmatched: Mapped[int | None]
-    error: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
 
 class VariableScoreRow(Base):
