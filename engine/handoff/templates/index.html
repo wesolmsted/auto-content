@@ -21,4 +21,19 @@
   {{ render_list(ready, "Nothing ready right now.") }}
   <h2>Saved, waiting for a post</h2>
   {{ render_list(awaiting_post, "No saved videos waiting.") }}
+  <h2>Micro edits</h2>
+  {% if micro %}
+    <ul class="renders">
+      {% for render in micro %}
+        <li>
+          <a href="/micro/{{ render.id }}">
+            <strong>{{ render.caption }}</strong>
+            <span class="meta">{{ render.text }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="meta">No micro edits right now.</p>
+  {% endif %}
 {% endblock %}
