@@ -180,3 +180,25 @@ def test_move_replaces_all_current_parents_with_the_target() -> None:
     update_query = query_of(update_uri)
     assert update_query["addParents"] == ["processed"]
     assert update_query["removeParents"] == ["inbox,other"]
+
+
+def test_list_files_returns_every_file_but_folders() -> None:
+    page = {
+        "files": [
+            {"id": "v1", "name": "hook_micro.mp4", "mimeType": "video/mp4", "md5Checksum": "a"},
+            {"id": "t1", "name": "hook_micro.txt", "mimeType": "text/plain", "md5Checksum": "b"},
+        ]
+    }
+    drive, http = client_for([ok(page)])
+
+    files = drive.list_files("inbox-folder")
+
+    assert [(file.id, file.mime_type) for file in files] == [
+        ("v1", "video/mp4"),
+        ("t1", "text/plain"),
+    ]
+    ((uri, *_),) = http.request_sequence
+    assert query_of(uri)["q"] == [
+        "'inbox-folder' in parents and mimeType != 'application/vnd.google-apps.folder' "
+        "and trashed = false"
+    ]

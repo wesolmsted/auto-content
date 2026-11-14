@@ -16,6 +16,7 @@ LIST_FIELDS = (
     "nextPageToken, files(id, name, mimeType, md5Checksum, size, createdTime, description)"
 )
 PAGE_SIZE = 100
+FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 
 class GoogleDriveClient:
@@ -35,19 +36,14 @@ class GoogleDriveClient:
         )
 
     def list_videos(self, folder_id: str) -> list[DriveFile]:
-        query = f"'{folder_id}' in parents and mimeType contains 'video/' and trashed = false"
-        videos: list[DriveFile] = []
-        page_token: str | None = None
-        while True:
-            response = self._execute(
-                self.service.files().list(
-                    q=query, fields=LIST_FIELDS, pageSize=PAGE_SIZE, pageToken=page_token
-                )
-            )
-            videos.extend(_to_drive_file(item) for item in response.get("files", []))
-            page_token = response.get("nextPageToken")
-            if not page_token:
-                return videos
+        return self._list(
+            f"'{folder_id}' in parents and mimeType contains 'video/' and trashed = false"
+        )
+
+    def list_files(self, folder_id: str) -> list[DriveFile]:
+        return self._list(
+            f"'{folder_id}' in parents and mimeType != '{FOLDER_MIME_TYPE}' and trashed = false"
+        )
 
     def download(self, file_id: str, dest: Path) -> Path:
         partial = dest.with_name(dest.name + ".part")
@@ -76,6 +72,20 @@ class GoogleDriveClient:
                 fields="id, parents",
             )
         )
+
+    def _list(self, query: str) -> list[DriveFile]:
+        files: list[DriveFile] = []
+        page_token: str | None = None
+        while True:
+            response = self._execute(
+                self.service.files().list(
+                    q=query, fields=LIST_FIELDS, pageSize=PAGE_SIZE, pageToken=page_token
+                )
+            )
+            files.extend(_to_drive_file(item) for item in response.get("files", []))
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                return files
 
     def _execute(self, request: Any) -> dict[str, Any]:
         response: dict[str, Any] = request.execute(num_retries=self.settings.max_retries)

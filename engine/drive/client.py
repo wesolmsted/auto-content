@@ -9,6 +9,10 @@ class DriveClient(Protocol):
         """Video files (`mimeType contains 'video/'`) directly in `folder_id`, not trashed."""
         ...
 
+    def list_files(self, folder_id: str) -> list[DriveFile]:
+        """Every file directly in `folder_id` (any type, folders excluded), not trashed."""
+        ...
+
     def download(self, file_id: str, dest: Path) -> Path:
         """Download to `dest` (resumable, retried with backoff) and return `dest`."""
         ...

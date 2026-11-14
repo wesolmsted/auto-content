@@ -59,6 +59,9 @@ class FakeDriveClient:
             if drive_file.mime_type.startswith("video/")
         ]
 
+    def list_files(self, folder_id: str) -> list[DriveFile]:
+        return list(self.folders.get(folder_id, []))
+
     def download(self, file_id: str, dest: Path) -> Path:
         if self._take_failure(self.fail_downloads, file_id):
             raise FakeDriveError(f"download of {file_id} failed")
