@@ -239,17 +239,3 @@ def test_missing_folder_ids_are_a_config_error(
     unset = settings.model_copy(update={"footage_processed_folder_id": None})
     with pytest.raises(ValueError, match="footage_processed_folder_id"):
         poll_footage(db_session, drive, store, unset, max_attempts=MAX_ATTEMPTS)
-
-
-def test_micro_videos_are_left_in_the_inbox_for_micro_ingest(
-    db_session: Session, drive: FakeDriveClient, store: LocalMediaStore, settings: DriveSettings
-) -> None:
-    drive.add_file(INBOX, "f1", b"footage", name="beach.mov")
-    drive.add_file(INBOX, "m1", b"finished reel", name="hook_MICRO.mp4")
-
-    summary = poll(db_session, drive, store, settings)
-
-    assert summary == PollSummary(listed=1, new=1, downloaded=1)
-    assert set(rows(db_session)) == {"f1"}
-    assert drive.downloads == ["f1"]
-    assert drive.file_ids_in(INBOX) == ["f1", "m1"]

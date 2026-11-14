@@ -10,7 +10,6 @@ from engine.db.models import FootageFileRow
 from engine.drive.client import DriveClient
 from engine.drive.models import DriveFile
 from engine.ingest.models import PollSummary
-from engine.micro.naming import is_micro_video_name
 from engine.storage.media_store import MediaKind, MediaStore
 
 JOB_NAME = "ingest_footage"
@@ -29,8 +28,7 @@ def poll_footage(
 
     1. Moves `tagged` footage files to the processed folder, marks them `done` and deletes
        their local download.
-    2. Lists the inbox folder and inserts unseen `drive_file_id`s as `new`, skipping `_micro`
-       videos, which micro ingest handles (§7.10). A file whose md5
+    2. Lists the inbox folder and inserts unseen `drive_file_id`s as `new`. A file whose md5
        matches an existing row is marked `duplicate` and moved to processed unprocessed.
     3. Downloads `new` files into `MediaKind.SCRATCH`, one at a time, setting `local_path` and
        status `downloaded`. Failures increment `attempts` and record `error`; a row reaching
@@ -43,9 +41,7 @@ def poll_footage(
     completed, failed_moves = complete_tagged_footage(
         session, drive, processed_folder_id, max_attempts
     )
-    listed = [
-        video for video in drive.list_videos(inbox_folder_id) if not is_micro_video_name(video.name)
-    ]
+    listed = drive.list_videos(inbox_folder_id)
     new, duplicates = _record_listing(session, drive, listed, processed_folder_id)
     downloaded, failed_downloads = _download_new(session, drive, store, max_attempts)
     return PollSummary(
