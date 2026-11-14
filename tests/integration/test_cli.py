@@ -96,6 +96,12 @@ def test_status_shows_counts_per_table_and_status(cli_env: Path) -> None:
         ["ingest", "references"],
         ["learn", "update"],
         ["report", "weekly"],
+        ["micro", "ingest"],
+        ["micro", "render"],
+        ["micro", "notify"],
+        ["micro", "run"],
+        ["micro", "list"],
+        ["micro", "retire", "1"],
     ],
     ids=" ".join,
 )

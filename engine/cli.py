@@ -16,6 +16,7 @@ from engine.ingest import cli as ingest_cli
 from engine.learn import cli as learn_cli
 from engine.log import configure_logging
 from engine.measure import cli as measure_cli
+from engine.micro import cli as micro_cli
 from engine.notify import cli as notify_cli
 from engine.render import cli as render_cli
 from engine.snippets import cli as snippets_cli
@@ -37,6 +38,7 @@ app.add_typer(measure_cli.app, name="measure")
 app.add_typer(measure_cli.posts_app, name="posts")
 app.add_typer(learn_cli.app, name="learn")
 app.add_typer(learn_cli.report_app, name="report")
+app.add_typer(micro_cli.app, name="micro")
 
 
 @app.callback()
