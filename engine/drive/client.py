@@ -13,6 +13,10 @@ class DriveClient(Protocol):
         """Every file directly in `folder_id` (any type, folders excluded), not trashed."""
         ...
 
+    def list_folders(self, folder_id: str) -> list[DriveFile]:
+        """The folders directly in `folder_id`, not trashed."""
+        ...
+
     def download(self, file_id: str, dest: Path) -> Path:
         """Download to `dest` (resumable, retried with backoff) and return `dest`."""
         ...

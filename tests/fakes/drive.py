@@ -6,6 +6,7 @@ from pathlib import Path
 from engine.drive.models import DriveFile
 
 COMPUTED_MD5 = "<md5 of content>"
+FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 
 class FakeDriveError(Exception):
@@ -14,6 +15,9 @@ class FakeDriveError(Exception):
 
 class FakeDriveClient:
     """Folders of files held in memory. Downloads write the file's bytes to `dest`.
+
+    `add_folder` nests a folder; `remove` and `replace_content` mimic the owner deleting or
+    re-uploading a file in Drive.
 
     `fail_downloads[file_id] = n` makes the next n downloads of that file raise FakeDriveError;
     `fail_moves` does the same for moves. `downloads` and `moves` record successful calls.
@@ -49,6 +53,27 @@ class FakeDriveClient:
         self.contents[file_id] = content
         return drive_file
 
+    def add_folder(self, parent_id: str, folder_id: str, name: str) -> DriveFile:
+        folder = DriveFile(id=folder_id, name=name, mime_type=FOLDER_MIME_TYPE)
+        self.folders.setdefault(parent_id, []).append(folder)
+        self.folders.setdefault(folder_id, [])
+        return folder
+
+    def remove(self, file_id: str) -> None:
+        """Delete a file, as the owner would in Drive."""
+        self._pop(file_id)
+        self.contents.pop(file_id, None)
+
+    def replace_content(self, file_id: str, content: bytes) -> None:
+        """Upload a new version: same id, new md5 and size."""
+        for files in self.folders.values():
+            for index, drive_file in enumerate(files):
+                if drive_file.id == file_id:
+                    files[index] = drive_file.model_copy(
+                        update={"md5": hashlib.md5(content).hexdigest(), "size_bytes": len(content)}
+                    )
+        self.contents[file_id] = content
+
     def file_ids_in(self, folder_id: str) -> list[str]:
         return [drive_file.id for drive_file in self.folders.get(folder_id, [])]
 
@@ -60,7 +85,18 @@ class FakeDriveClient:
         ]
 
     def list_files(self, folder_id: str) -> list[DriveFile]:
-        return list(self.folders.get(folder_id, []))
+        return [
+            drive_file
+            for drive_file in self.folders.get(folder_id, [])
+            if drive_file.mime_type != FOLDER_MIME_TYPE
+        ]
+
+    def list_folders(self, folder_id: str) -> list[DriveFile]:
+        return [
+            drive_file
+            for drive_file in self.folders.get(folder_id, [])
+            if drive_file.mime_type == FOLDER_MIME_TYPE
+        ]
 
     def download(self, file_id: str, dest: Path) -> Path:
         if self._take_failure(self.fail_downloads, file_id):

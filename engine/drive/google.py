@@ -45,6 +45,11 @@ class GoogleDriveClient:
             f"'{folder_id}' in parents and mimeType != '{FOLDER_MIME_TYPE}' and trashed = false"
         )
 
+    def list_folders(self, folder_id: str) -> list[DriveFile]:
+        return self._list(
+            f"'{folder_id}' in parents and mimeType = '{FOLDER_MIME_TYPE}' and trashed = false"
+        )
+
     def download(self, file_id: str, dest: Path) -> Path:
         partial = dest.with_name(dest.name + ".part")
         request = self.service.files().get_media(fileId=file_id)

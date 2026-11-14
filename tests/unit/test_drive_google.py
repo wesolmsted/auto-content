@@ -202,3 +202,25 @@ def test_list_files_returns_every_file_but_folders() -> None:
         "'inbox-folder' in parents and mimeType != 'application/vnd.google-apps.folder' "
         "and trashed = false"
     ]
+
+
+def test_list_folders_returns_only_subfolders() -> None:
+    page = {
+        "files": [
+            {
+                "id": "d1",
+                "name": "you dont dance_micro",
+                "mimeType": "application/vnd.google-apps.folder",
+            }
+        ]
+    }
+    drive, http = client_for([ok(page)])
+
+    folders = drive.list_folders("inbox-folder")
+
+    assert [(folder.id, folder.name) for folder in folders] == [("d1", "you dont dance_micro")]
+    ((uri, *_),) = http.request_sequence
+    assert query_of(uri)["q"] == [
+        "'inbox-folder' in parents and mimeType = 'application/vnd.google-apps.folder' "
+        "and trashed = false"
+    ]
