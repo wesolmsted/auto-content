@@ -22,12 +22,17 @@ class RenderStatus(StrEnum):
     FAILED = "failed"
 
 
+class MicroSetStatus(StrEnum):
+    WAITING = "waiting"
+    ACTIVE = "active"
+    REMOVED = "removed"
+
+
 class MicroSourceStatus(StrEnum):
     NEW = "new"
-    DOWNLOADED = "downloaded"
     READY = "ready"
     DUPLICATE = "duplicate"
-    RETIRED = "retired"
+    REMOVED = "removed"
     FAILED = "failed"
 
 

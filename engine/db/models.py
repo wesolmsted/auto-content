@@ -15,6 +15,7 @@ from engine.db.enums import (
     MetricCheckpoint,
     MetricSource,
     MicroRenderStatus,
+    MicroSetStatus,
     MicroSourceStatus,
     Orientation,
     Platform,
@@ -225,19 +226,38 @@ class StyleReferenceRow(Base):
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
 
+class MicroSetRow(Base):
+    """A live `<song>_micro` Drive folder: its sidecar's song and text options (DESIGN.md §7.10)."""
+
+    __tablename__ = "micro_sets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    drive_folder_id: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
+    song_title: Mapped[str | None]
+    text_options_json: Mapped[list[Any]] = mapped_column(default=list)
+    next_text_index: Mapped[int] = mapped_column(default=0)
+    sidecar_drive_file_id: Mapped[str | None]
+    sidecar_md5: Mapped[str | None]
+    status: Mapped[MicroSetStatus] = mapped_column(
+        StrEnumType(MicroSetStatus), default=MicroSetStatus.WAITING, index=True
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    last_used_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+
 class MicroSourceRow(Base):
-    """A finished `*_micro` reel and its sidecar's song and text options (DESIGN.md §7.10)."""
+    """One finished video in a micro set."""
 
     __tablename__ = "micro_sources"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    set_id: Mapped[int] = mapped_column(ForeignKey("micro_sets.id"), index=True)
     drive_file_id: Mapped[str] = mapped_column(unique=True)
     md5: Mapped[str | None] = mapped_column(index=True)
     name: Mapped[str]
-    sidecar_drive_file_id: Mapped[str | None]
-    song_title: Mapped[str | None]
-    text_options_json: Mapped[list[Any]] = mapped_column(default=list)
-    next_text_index: Mapped[int] = mapped_column(default=0)
     local_path: Mapped[str | None]
     duration_s: Mapped[float | None]
     has_audio: Mapped[bool | None]

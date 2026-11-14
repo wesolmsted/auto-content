@@ -1,8 +1,8 @@
-"""Micro edits: `micro_sources` and `micro_renders` (DESIGN.md §7.10, D12).
+"""Micro edits: `micro_sets`, `micro_sources` and `micro_renders` (DESIGN.md §7.10, D12).
 
 Revision ID: 0003
 Revises: 0002
-Create Date: 2026-11-14 17:41:25.488703
+Create Date: 2026-11-14 17:54:42.460396
 """
 
 from collections.abc import Sequence
@@ -18,15 +18,33 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
-        "micro_sources",
+        "micro_sets",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("drive_file_id", sa.String(), nullable=False),
-        sa.Column("md5", sa.String(), nullable=True),
+        sa.Column("drive_folder_id", sa.String(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("sidecar_drive_file_id", sa.String(), nullable=True),
         sa.Column("song_title", sa.String(), nullable=True),
         sa.Column("text_options_json", sa.JSON(), nullable=False),
         sa.Column("next_text_index", sa.Integer(), nullable=False),
+        sa.Column("sidecar_drive_file_id", sa.String(), nullable=True),
+        sa.Column("sidecar_md5", sa.String(), nullable=True),
+        sa.Column("status", sa.String(length=32), nullable=False),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("drive_folder_id"),
+    )
+    with op.batch_alter_table("micro_sets", schema=None) as batch_op:
+        batch_op.create_index(batch_op.f("ix_micro_sets_status"), ["status"], unique=False)
+
+    op.create_table(
+        "micro_sources",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("set_id", sa.Integer(), nullable=False),
+        sa.Column("drive_file_id", sa.String(), nullable=False),
+        sa.Column("md5", sa.String(), nullable=True),
+        sa.Column("name", sa.String(), nullable=False),
         sa.Column("local_path", sa.String(), nullable=True),
         sa.Column("duration_s", sa.Double(), nullable=True),
         sa.Column("has_audio", sa.Boolean(), nullable=True),
@@ -36,11 +54,16 @@ def upgrade() -> None:
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["set_id"],
+            ["micro_sets.id"],
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("drive_file_id"),
     )
     with op.batch_alter_table("micro_sources", schema=None) as batch_op:
         batch_op.create_index(batch_op.f("ix_micro_sources_md5"), ["md5"], unique=False)
+        batch_op.create_index(batch_op.f("ix_micro_sources_set_id"), ["set_id"], unique=False)
         batch_op.create_index(batch_op.f("ix_micro_sources_status"), ["status"], unique=False)
 
     op.create_table(
@@ -85,6 +108,11 @@ def downgrade() -> None:
     op.drop_table("micro_renders")
     with op.batch_alter_table("micro_sources", schema=None) as batch_op:
         batch_op.drop_index(batch_op.f("ix_micro_sources_status"))
+        batch_op.drop_index(batch_op.f("ix_micro_sources_set_id"))
         batch_op.drop_index(batch_op.f("ix_micro_sources_md5"))
 
     op.drop_table("micro_sources")
+    with op.batch_alter_table("micro_sets", schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f("ix_micro_sets_status"))
+
+    op.drop_table("micro_sets")
