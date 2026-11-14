@@ -34,4 +34,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 14: expiry](task-14-expiry.md): expiry from notified_at, unnotified never expire, ace notify pending supersedes before sending
 - [Task 15: snippet start](task-15-snippet-start.md): snap_start_to_downbeat, snippets add stores the snapped start; old snippets must be re-added
 - [Task 12: planning](task-12-planning.md): recipe-first balance, in-video drop preference, chained one_long_shot (fit_long_shots), ignore_limits/ignore_cooldown, render batch exit 1 on failure
-- [Task 16: micro foundation](task-16-micro-foundation.md): micro tables, [micro] config, list_files, contracts and stub owners for slices 17-20
+- [Task 16: micro foundation](task-16-micro-foundation.md): micro sets/sources/renders tables, [micro] config, list_files/list_folders, fake Drive helpers, contracts and stub owners for slices 17-20
