@@ -1,4 +1,5 @@
 import shutil
+from datetime import time
 from pathlib import Path
 
 import pytest
@@ -151,3 +152,25 @@ def test_google_client_json_path_expands_the_home_directory(
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_JSON", "~/secrets/client.json")
     settings = load_settings(config_dir, env_file=None)
     assert settings.google_oauth_client_json == tmp_path / "secrets" / "client.json"
+
+
+def test_micro_defaults_are_three_daily_slots_and_small_edit_ranges() -> None:
+    micro = load_settings(REPO_CONFIG_DIR, env_file=None).micro
+    assert micro.post_times == (time(9, 0), time(13, 0), time(18, 0))
+    assert micro.trim_s == (0.1, 0.5)
+    assert micro.speed_change == (0.01, 0.03)
+    assert micro.zoom == (1.02, 1.05)
+    assert micro.mirror_probability == 0.5
+    assert micro.expire_hours == 24
+
+
+def test_micro_ranges_must_run_low_to_high(config_dir: Path) -> None:
+    write_local(config_dir, "[micro]\nzoom = [1.05, 1.02]\n")
+    with pytest.raises(ValueError, match="zoom"):
+        load_settings(config_dir, env_file=None)
+
+
+def test_micro_post_times_must_be_distinct(config_dir: Path) -> None:
+    write_local(config_dir, "[micro]\npost_times = [09:00:00, 09:00:00]\n")
+    with pytest.raises(ValueError, match="post_times"):
+        load_settings(config_dir, env_file=None)

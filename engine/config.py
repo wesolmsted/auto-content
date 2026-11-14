@@ -184,6 +184,43 @@ class LearnSettings(Section):
     superseded_weight: float = Field(ge=0, le=1)
 
 
+class MicroSettings(Section):
+    """Micro edits (DESIGN.md §7.10). Ranges are (low, high); `post_times` are local times."""
+
+    post_times: tuple[time, ...]
+    late_grace_minutes: int = Field(ge=0)
+    expire_hours: int = Field(gt=0)
+    max_attempts: int = Field(gt=0)
+    min_source_s: float = Field(gt=0)
+    trim_s: tuple[float, float]
+    speed_change: tuple[float, float]
+    zoom: tuple[float, float]
+    mirror_probability: float = Field(ge=0, le=1)
+    brightness: float = Field(ge=0)
+    contrast: tuple[float, float]
+    saturation: tuple[float, float]
+    hue_degrees: float = Field(ge=0)
+    text_size_fraction: float = Field(gt=0)
+    text_size_jitter: float = Field(ge=0, lt=1)
+    text_y_jitter: float = Field(ge=0)
+    text_max_chars: int = Field(gt=0)
+
+    @field_validator("trim_s", "speed_change", "zoom", "contrast", "saturation")
+    @classmethod
+    def _low_to_high(cls, bounds: tuple[float, float]) -> tuple[float, float]:
+        low, high = bounds
+        if low > high:
+            raise ValueError(f"range must run low to high, got [{low}, {high}]")
+        return bounds
+
+    @field_validator("post_times")
+    @classmethod
+    def _distinct_times(cls, post_times: tuple[time, ...]) -> tuple[time, ...]:
+        if len(set(post_times)) != len(post_times):
+            raise ValueError("post_times must be distinct")
+        return tuple(sorted(post_times))
+
+
 def _secret(env_name: str) -> Any:
     return Field(default=None, validation_alias=env_name)
 
@@ -218,6 +255,7 @@ class Settings(BaseSettings):
     measure: MeasureSettings
     http: HttpSettings
     learn: LearnSettings
+    micro: MicroSettings
 
     google_oauth_client_json: Path | None = _secret("GOOGLE_OAUTH_CLIENT_JSON")
     anthropic_api_key: SecretStr | None = _secret("ANTHROPIC_API_KEY")

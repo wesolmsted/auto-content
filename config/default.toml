@@ -195,3 +195,23 @@ baseline_window = 30
 explore_rate = 0.2
 settled_min_posts = 8
 superseded_weight = 0.25
+
+# Micro edits (DESIGN.md §7.10): small random edits to finished `*_micro` reels.
+[micro]
+post_times = [09:00:00, 13:00:00, 18:00:00]   # daily slots, in notify.timezone
+late_grace_minutes = 30       # a slot further past than this is skipped for the day
+expire_hours = 24             # an unsaved micro render is superseded this long after its notification
+max_attempts = 3              # ingest download/probe/move tries per step
+min_source_s = 3.0
+trim_s = [0.1, 0.5]           # cut off the start, and separately off the end
+speed_change = [0.01, 0.03]   # fraction faster or slower, video and audio together
+zoom = [1.02, 1.05]
+mirror_probability = 0.5
+brightness = 0.03             # +/-
+contrast = [0.95, 1.08]
+saturation = [0.9, 1.15]
+hue_degrees = 4.0             # +/-
+text_size_fraction = 0.05     # of frame height
+text_size_jitter = 0.1        # +/- fraction of text_size_fraction
+text_y_jitter = 0.02          # +/- fraction of frame height
+text_max_chars = 18           # per line; longer text wraps
