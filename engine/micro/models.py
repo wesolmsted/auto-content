@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Sidecar(BaseModel):
-    """A parsed `<stem>.txt` sidecar: the song name (the caption) and the on-screen texts."""
+    """A micro set's parsed `.txt`: the song name (the caption) and the on-screen texts."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -59,12 +59,16 @@ class MicroSourceMedia(BaseModel):
 
 
 class MicroIngestSummary(BaseModel):
+    """What one `poll_micro_sets` run did. Set counts first, then video counts."""
+
     model_config = ConfigDict(frozen=True)
 
-    listed: int = 0
-    new: int = 0
-    duplicates: int = 0
-    waiting_for_sidecar: int = 0
-    downloaded: int = 0
-    ready: int = 0
-    failed: int = 0
+    sets: int = 0
+    new_sets: int = 0
+    waiting_sets: int = 0
+    removed_sets: int = 0
+    new_videos: int = 0
+    ready_videos: int = 0
+    duplicate_videos: int = 0
+    removed_videos: int = 0
+    failed_videos: int = 0

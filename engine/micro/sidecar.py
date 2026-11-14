@@ -6,6 +6,6 @@ class SidecarError(ValueError):
 
 
 def parse_sidecar(text: str) -> Sidecar:
-    """Parse a sidecar: first non-empty line `song: <name>`, then one text option per
-    non-empty line. Raises SidecarError."""
+    """Parse a micro set's `.txt`: first non-empty line `song: <name>`, then one text option
+    per non-empty line. Raises SidecarError."""
     raise NotImplementedError

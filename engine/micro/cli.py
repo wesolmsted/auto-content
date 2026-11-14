@@ -7,7 +7,7 @@ app = typer.Typer(help="Micro edits of finished reels (DESIGN.md §7.10).", no_a
 
 @app.command()
 def ingest() -> None:
-    """Record new `_micro` videos and their sidecars from the footage inbox."""
+    """Sync the `_micro` folders in the footage inbox: sets, texts and videos."""
     not_implemented()
 
 
@@ -31,11 +31,5 @@ def run() -> None:
 
 @app.command("list")
 def list_sources() -> None:
-    """Micro sources and their render counts."""
-    not_implemented()
-
-
-@app.command()
-def retire(source_id: int) -> None:
-    """Stop using a micro source."""
+    """Micro sets, their videos and render counts."""
     not_implemented()
