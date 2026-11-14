@@ -18,7 +18,7 @@
 | D6 | Database | SQLite via SQLAlchemy 2.0 + Alembic | Single file locally; same models move to Postgres in the cloud. |
 | D7 | Orchestration | DB-driven idempotent jobs, triggered by CLI commands on a schedule | No queue broker. Each run picks up whatever work the DB says is due. |
 | D11 | Platforms | **Instagram Trial Reels only** | Every render targets `ig_trial`, and only the Meta Graph API is read. The platform plumbing (`Platform` enum, per-target captions and posts, `PlatformReader`, scores keyed by platform) stays, with one value. |
-| D12 | Micro edits | **Videos named `*_micro` get small random edits, kept fully separate from recipe renders** | An already-finished reel is reposted as Trial Reels three times a day. Each copy gets fresh small edits (trim, speed, zoom, mirror, color, on-screen text from a sidecar `.txt`) so it isn't a duplicate. Micro renders have their own tables, schedule and hand-off section, and no posts, metrics or learning (§7.10). |
+| D12 | Micro edits | **`<song>_micro` folders of finished reels get small random edits, kept fully separate from recipe renders** | Finished reels are reposted as Trial Reels three times a day. A folder holds several videos and one `.txt` with the song name and on-screen texts. Each copy gets fresh small edits (trim, speed, zoom, mirror, color, on-screen text) so it isn't a duplicate. Micro renders have their own tables, schedule and hand-off section, and no posts, metrics or learning (§7.10). |
 
 New decisions get appended to the decision log in §13.
 
@@ -77,7 +77,7 @@ Two long-lived processes at most: the scheduler (launchd locally, cron/cloud sch
 | `ace measure due` | hourly | Matches newly posted videos to renders, then pulls any due 24 h / 72 h checkpoints. |
 | `ace learn update` | daily, after measure | Recomputes variable scores. Phase 2. |
 | `ace report weekly` | Mondays 07:00 | Report + shoot list. Phase 2. |
-| `ace micro run` | every 15 min | Micro edits (§7.10): ingest `_micro` files, render today's slots, send due notifications. |
+| `ace micro run` | every 15 min | Micro edits (§7.10): re-read the `_micro` folders, render today's slots, send due notifications. |
 
 ---
 
@@ -204,11 +204,15 @@ style_references
   status [new|downloaded|analyzed|failed], error, attempts,
   style_card_json, recipe_id FK NULL, recreation_notes, created_at, updated_at
 
-micro_sources                                           -- §7.10
-  id PK, drive_file_id UNIQUE, md5, name, sidecar_drive_file_id NULL,
-  song_title NULL, text_options_json, next_text_index INT DEFAULT 0,
+micro_sets                                              -- §7.10: one `<song>_micro` Drive folder
+  id PK, drive_folder_id UNIQUE, name, song_title NULL, text_options_json,
+  next_text_index INT DEFAULT 0, sidecar_drive_file_id NULL, sidecar_md5 NULL,
+  status [waiting|active|removed], error, last_used_at NULL, created_at, updated_at
+
+micro_sources                                           -- one video in a micro set
+  id PK, set_id FK, drive_file_id UNIQUE, md5, name,
   local_path NULL, duration_s NULL, has_audio BOOL NULL,
-  status [new|downloaded|ready|duplicate|retired|failed], error, attempts,
+  status [new|ready|duplicate|removed|failed], error, attempts,
   last_used_at NULL, created_at, updated_at
 
 micro_renders                                           -- §7.10; no posts, metrics or scores
@@ -417,9 +421,9 @@ Reuses the Drive poller with the references folder. Measurement (scene cuts, bea
 
 ### 7.10 Micro edits (D12)
 
-Sometimes the owner uploads a reel that is already edited the way they want it. The job is to post it again and again as Trial Reels, each copy changed just enough that Instagram doesn't treat it as a duplicate. These are **micro renders**. They are separate from recipe renders in every table, command and page, and are never measured or learned from. Instagram's duplicate detection isn't public, so there's no guarantee a variant passes; the edit ranges are config so they can be tuned.
+Sometimes the owner has reels that are already edited the way they want them. The job is to post them again and again as Trial Reels, each copy changed just enough that Instagram doesn't treat it as a duplicate. These are **micro renders**. They are separate from recipe renders in every table, command and page, and are never measured or learned from. Instagram's duplicate detection isn't public, so there's no guarantee a variant passes; the edit ranges are config so they can be tuned.
 
-**Input.** A video in the footage inbox whose file stem ends in `_micro` (any case, e.g. `beach_hook_MICRO.mov`), plus a sidecar text file in the same folder with the same stem and a `.txt` extension:
+**Input.** A folder in the footage inbox whose name ends in `_micro` (any case, e.g. `you dont dance_micro`) is a **micro set**. It holds any number of finished videos and exactly one `.txt` file:
 
 ```
 song: You Dont Dance
@@ -427,18 +431,19 @@ POV: you finally hit the drop
 wait for it
 ```
 
-- The first non-empty line must be `song: <name>`; the name is the caption.
-- Every other non-empty line is one on-screen text option (at least one).
-- The video has no text burned in. Its own audio track is used.
+- The first non-empty line must be `song: <name>`; the name is the caption. The folder name is only a label.
+- Every other non-empty line is one on-screen text option (at least one), shared by all the set's videos.
+- The videos have no text burned in. Each video's own audio track is used.
 
-**Ingest** (`ace micro ingest`):
-1. The footage poller (§7.1) skips `_micro` videos; only micro ingest handles them. It lists the inbox with `DriveClient.list_files`, which also returns the `.txt` sidecars.
-2. Unseen micro videos are inserted into `micro_sources` as `new`. A video whose md5 matches a source that isn't `retired` is a `duplicate` and is moved to Processed.
-3. For each `new` source, the sidecar is found by name, downloaded and parsed. If it's missing or invalid, the problem goes in `error` and the next run tries again without counting an attempt (the owner may still be uploading it).
-4. The video is downloaded to `media/micro/` and probed (duration, audio). It is kept there, since a source is reused indefinitely. Status `downloaded`. Download and probe failures count `attempts`.
-5. The video and its sidecar move to Processed; status `ready`.
+The folder stays in the inbox and is **live**: every run re-reads it, so videos added later join the rotation, deleted videos stop being used, and edits to the `.txt` take effect. Nothing is moved in Drive. Removing the folder from the inbox (or renaming it) stops the set. The footage poller (§7.1) only lists videos directly in the inbox, so it never sees files inside micro folders.
 
-Text options are read once. To change them, retire the source (`ace micro retire <id>`) and upload the video again with a new sidecar.
+**Ingest** (`ace micro ingest`), per run:
+1. List the inbox's subfolders (`DriveClient.list_folders`). Each `_micro` folder not yet in `micro_sets` is inserted as `waiting`. A set whose folder is no longer listed becomes `removed` (it comes back if the folder reappears).
+2. For each set that isn't `removed`, list its files (`DriveClient.list_files`). The `.txt`: when its id or md5 differs from `sidecar_drive_file_id`/`sidecar_md5`, download and parse it. Valid → store `song_title` and `text_options_json` and the set is `active` (`next_text_index` is kept; it's taken modulo the option count). Missing, more than one `.txt`, or invalid → the problem goes in `error`; a set that never had a valid sidecar stays `waiting`, and an `active` one keeps its last good texts.
+3. Videos (`mime_type` `video/*`): an unseen file id becomes a `micro_sources` row `new`. A video whose md5 matches another non-`removed` micro source is a `duplicate` and is never downloaded. A known video no longer in the folder becomes `removed` and its local copy is deleted; if it reappears it goes back to `new`. A video whose md5 changed goes back to `new`.
+4. Each `new` video is downloaded to `media/micro/micro_source_<id><suffix>` and probed (duration, audio). Shorter than `micro.min_source_s` → `failed` (owner error, no retry). Otherwise `ready`. Download and probe failures count `attempts`; at `micro.max_attempts` → `failed`.
+
+Commits happen after each state change, so no write transaction is open during a Drive call.
 
 **Edits** (pure: `sample_edit(rng, settings.micro, text) -> MicroEdit`). Every variant draws fresh values, each from a config range:
 - trim: 0.1–0.5 s off the start and off the end;
@@ -450,13 +455,13 @@ Text options are read once. To change them, retire the source (`ace micro retire
 
 The variant is re-encoded with the render settings (1080×1920, 30 fps), with source metadata stripped. Its duration is (source duration − trims) / speed. Validation checks that duration within one frame, the 9:16 size, and an audio stream if the source has one.
 
-**Schedule** (`ace micro render`). `micro.post_times` (default 09:00, 13:00 and 18:00 in `notify.timezone`) are the daily slots. Each run fills every slot today that has no micro render yet and isn't more than `micro.late_grace_minutes` past. A slot takes the `ready` source used least recently (never used first, ties by id), so several sources rotate. A slot with any micro render, failed included, counts as filled; the render itself retries up to `render.max_attempts`, like recipe renders.
+**Schedule** (`ace micro render`). `micro.post_times` (default 09:00, 13:00 and 18:00 in `notify.timezone`) are the daily slots. Each run fills every slot today that has no micro render yet and isn't more than `micro.late_grace_minutes` past. A slot takes the `active` set used least recently, then that set's `ready` video used least recently (never used first, ties by id), so sets take turns and each set's videos get used evenly. The text is the set's next option (`text_options_json[next_text_index % len]`), so consecutive posts from a set never reuse a text, whichever video they use. `last_used_at` (set and video) is the slot's `scheduled_for`, not the run time, so slots filled in the same run still rotate. A slot with any micro render, failed included, counts as filled; the render itself retries up to `render.max_attempts`, like recipe renders.
 
 **Notify** (`ace micro notify`). First, `ready` micro renders notified more than `micro.expire_hours` (24) ago become `superseded`. Then one notification goes out per `ready` micro render whose `scheduled_for` has passed and whose `notified_at` is NULL: title `Micro ready: <song>`, linking to `/micro/{id}`. Quiet hours don't apply, since the slots are the timing.
 
 **Hand-off.** The index page has its own *Micro edits* list. `/micro/{id}` shows the preview, *Save video*, and the caption (the song name) with *Copy caption*. The first download moves `ready → downloaded`. There's no reject button, no `posts` row and no matching. A superseded micro render can't be downloaded (409).
 
-`ace micro run` runs ingest, render and notify in that order, so one 15-minute scheduled job covers everything. `ace micro list` shows the sources with their render counts.
+`ace micro run` runs ingest, render and notify in that order, so one 15-minute scheduled job covers everything. `ace micro list` shows each set (status, song, texts, next text) and its videos with their render counts.
 
 ---
 
@@ -517,8 +522,7 @@ ace learn update
 ace report weekly
 ace status                      # counts per table/status, recent failures
 ace micro ingest | render | notify | run                           # micro edits (§7.10); run = all three
-ace micro list                  # micro sources and their render counts
-ace micro retire <source_id>    # stop using a micro source
+ace micro list                  # micro sets, their videos and render counts
 ```
 
 ---
@@ -559,10 +563,10 @@ Each slice ends with something runnable and tested.
 
 **Micro edits** (§7.10, D12):
 
-16. **Micro foundation** (main agent): `micro_sources`/`micro_renders` + migration 0003, `[micro]` config, `MediaKind.MICRO`, `DriveClient.list_files`, the footage poller skipping `_micro` videos, `engine/micro/models.py` contracts and stubs.
+16. **Micro foundation** (main agent): `micro_sets`/`micro_sources`/`micro_renders` + migration 0003, `[micro]` config, `MediaKind.MICRO`, `DriveClient.list_files`/`list_folders`, `engine/micro/models.py` contracts and stubs.
 17. **Micro edits**: `sample_edit`, the FFmpeg command, render and validation.
-18. **Micro ingest**: sidecar parsing, `poll_micro_sources`.
-19. **Micro schedule**: slots, source rotation, the render job, notifications and expiry, `ace micro …`.
+18. **Micro ingest**: sidecar parsing, `poll_micro_sets`.
+19. **Micro schedule**: slots, set and video rotation, the render job, notifications and expiry, `ace micro …`.
 20. **Micro hand-off**: index list, `/micro/{id}` page, download.
 
 Phases 2–4 follow the README roadmap; each gets broken into slices here before work starts. Build order follows the prototype-first rule: get each slice working end to end before adding refinements, and add a refinement only when real usage shows the simpler version falls short.
@@ -591,7 +595,7 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | 2026-11-09 | — | `footage_orientation` (portrait · landscape) is a recipe variable; a render never mixes orientations | First real run: landscape music-video shots center-cropped to 9:16 lose content and look different from portrait phone footage. Making it a variable keeps renders consistent and lets the learning loop measure whether cropped landscape footage performs. |
 | 2026-11-08 | — | ~~TikTok watch time from a weekly TikTok Studio export~~ | Superseded by D11. |
 | 2026-11-14 | D11 | Instagram Trial Reels only; TikTok removed | Owner decision to cut scope. Removed: the TikTok reader and `ace auth tiktok`, TikTok link parsing, the TikTok cadence and caption config, the TikTok Studio export import (`ace ingest exports`, `metric_imports`, the `export` metric checkpoint/source). Migration 0002 drops `metric_imports` and deletes TikTok rows. The multi-platform plumbing stays so a platform can be added back. |
-| 2026-11-14 | D12 | Micro edits from `_micro` files, separate from recipe renders | Owner request: post a finished reel 3× a day as Trial Reels without duplicate flags. The owner chose: no burned-in text in the upload, text options and song name from a sidecar `.txt`, all edit types (mirror and audio speed shift included), unlimited reuse with texts cycling, three slots spread across the day, no tracking or learning. |
+| 2026-11-14 | D12 | Micro edits from `<song>_micro` folders, separate from recipe renders | Owner request: post finished reels 3× a day as Trial Reels without duplicate flags. The owner chose: no burned-in text in the uploads; a folder of several videos plus one `.txt` with `song:` and the text options; the folder stays live in the inbox; all edit types (mirror and audio speed shift included); unlimited reuse, sets and videos least recently used first, texts cycling per set; three slots spread across the day; no tracking or learning. A first draft used single `*_micro` files with a same-name sidecar; migration 0003 was reworked before any database applied it. |
 
 ---
 
