@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ render.caption }} · Micro edit{% endblock %}
+{% block content %}
+  <p><a href="/">&larr; All hand-offs</a></p>
+  <h1>{{ render.caption }}</h1>
+  <p class="meta">
+    Micro edit{% if render.duration_s %} · {{ "%.0f" | format(render.duration_s) }} s{% endif %}
+    · {{ render.status }}
+  </p>
+
+  <video src="/micro/{{ render.id }}/preview" controls playsinline preload="metadata"></video>
+
+  {% if can_save %}
+    <a class="button primary" id="save-video" href="/micro/{{ render.id }}/download"
+       download="{{ filename }}">Save video</a>
+  {% endif %}
+
+  <section class="card">
+    <h2>Instagram Trial Reel</h2>
+    <p class="reminder">{{ reminder }}</p>
+    <p class="caption" id="caption">{{ render.caption }}</p>
+    <button type="button" class="copy" data-caption="caption">Copy caption</button>
+    <p class="meta">On-screen text: {{ render.text }}</p>
+  </section>
+{% endblock %}

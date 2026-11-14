@@ -1,4 +1,7 @@
-"""The hand-off web page (DESIGN.md §7.5): preview, save (= approve), reject, link post."""
+"""The hand-off web page (DESIGN.md §7.5): preview, save (= approve), reject, link post.
+
+Micro renders (§7.10) get their own list and `/micro/{id}` pages: preview and save only.
+"""
 
 import hashlib
 from collections.abc import Awaitable, Callable
@@ -18,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from engine.config import Settings
 from engine.db.enums import Platform, PostStatus, RejectReason, RenderStatus
-from engine.db.models import PostRow, RecipeRow, RenderRow, SnippetRow, SongRow
+from engine.db.models import MicroRenderRow, PostRow, RecipeRow, RenderRow, SnippetRow, SongRow
 from engine.db.session import session_scope
 from engine.handoff.approval import (
     LINKABLE,
@@ -31,6 +34,13 @@ from engine.handoff.approval import (
     reject_render,
 )
 from engine.handoff.links import PostUrlError
+from engine.handoff.micro import (
+    MICRO_DOWNLOADABLE,
+    check_micro_downloadable,
+    due_micro_renders,
+    get_micro_render,
+    record_micro_download,
+)
 from engine.notify.handoff import recipe_short_name
 from engine.storage.media_store import MediaKind, MediaStore
 
@@ -52,6 +62,13 @@ class RenderSummary:
     style: str
     status: RenderStatus
     duration_s: float | None
+
+
+@dataclass(frozen=True)
+class MicroSummary:
+    id: int
+    caption: str
+    text: str
 
 
 @dataclass(frozen=True)
@@ -138,6 +155,10 @@ def create_app(
             context = {
                 "ready": [_summary(session, render) for render in ready],
                 "awaiting_post": [_summary(session, render) for render in awaiting_post],
+                "micro": [
+                    MicroSummary(id=render.id, caption=render.caption, text=render.text)
+                    for render in due_micro_renders(session, clock())
+                ],
             }
         return TEMPLATES.TemplateResponse(request, "index.html", context)
 
@@ -159,6 +180,33 @@ def create_app(
             check_downloadable(render)
             path = _video_path(store, render)
             record_download(session, render, clock())
+        return FileResponse(path, media_type="video/mp4", filename=path.name)
+
+    @app.get("/micro/{render_id}")
+    def micro_page(request: Request, render_id: int) -> Response:
+        with session_factory() as session:
+            render = get_micro_render(session, render_id)
+            context = {
+                "render": render,
+                "filename": Path(render.file_path or f"micro_{render.id}.mp4").name,
+                "reminder": POSTING_REMINDERS[Platform.IG_TRIAL],
+                "can_save": render.status in MICRO_DOWNLOADABLE,
+            }
+            return TEMPLATES.TemplateResponse(request, "micro.html", context)
+
+    @app.get("/micro/{render_id}/preview")
+    def micro_preview(render_id: int) -> Response:
+        with session_factory() as session:
+            path = _video_path(store, get_micro_render(session, render_id))
+        return FileResponse(path, media_type="video/mp4")
+
+    @app.get("/micro/{render_id}/download")
+    def micro_download(render_id: int) -> Response:
+        with session_scope(session_factory) as session:
+            render = get_micro_render(session, render_id)
+            check_micro_downloadable(render)
+            path = _video_path(store, render)
+            record_micro_download(session, render, clock())
         return FileResponse(path, media_type="video/mp4", filename=path.name)
 
     @app.post("/handoff/{render_id}/reject")
@@ -202,7 +250,7 @@ def _cookie_value(token: SecretStr | None) -> str | None:
     return _digest(token.get_secret_value())
 
 
-def _video_path(store: MediaStore, render: RenderRow) -> Path:
+def _video_path(store: MediaStore, render: RenderRow | MicroRenderRow) -> Path:
     if render.file_path is not None:
         path = store.path_for(MediaKind.RENDERS, Path(render.file_path).name)
         if path.is_file():
