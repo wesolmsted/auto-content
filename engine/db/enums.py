@@ -22,6 +22,23 @@ class RenderStatus(StrEnum):
     FAILED = "failed"
 
 
+class MicroSourceStatus(StrEnum):
+    NEW = "new"
+    DOWNLOADED = "downloaded"
+    READY = "ready"
+    DUPLICATE = "duplicate"
+    RETIRED = "retired"
+    FAILED = "failed"
+
+
+class MicroRenderStatus(StrEnum):
+    RENDERING = "rendering"
+    READY = "ready"
+    DOWNLOADED = "downloaded"
+    SUPERSEDED = "superseded"
+    FAILED = "failed"
+
+
 class PostStatus(StrEnum):
     AWAITING_POST = "awaiting_post"
     MATCHED = "matched"

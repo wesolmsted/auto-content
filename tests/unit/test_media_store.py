@@ -35,6 +35,7 @@ def test_names_must_be_plain_file_names(tmp_path: Path, name: str) -> None:
 def test_ensure_dirs_creates_every_kind(tmp_path: Path) -> None:
     LocalMediaStore(tmp_path / "media").ensure_dirs()
     assert sorted(path.name for path in (tmp_path / "media").iterdir()) == [
+        "micro",
         "renders",
         "scratch",
         "shots",

@@ -14,6 +14,8 @@ from engine.db.enums import (
     MatchMethod,
     MetricCheckpoint,
     MetricSource,
+    MicroRenderStatus,
+    MicroSourceStatus,
     Orientation,
     Platform,
     PostStatus,
@@ -219,5 +221,57 @@ class StyleReferenceRow(Base):
     style_card_json: Mapped[dict[str, Any] | None]
     recipe_id: Mapped[str | None] = mapped_column(ForeignKey("recipes.id"))
     recreation_notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+
+class MicroSourceRow(Base):
+    """A finished `*_micro` reel and its sidecar's song and text options (DESIGN.md §7.10)."""
+
+    __tablename__ = "micro_sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    drive_file_id: Mapped[str] = mapped_column(unique=True)
+    md5: Mapped[str | None] = mapped_column(index=True)
+    name: Mapped[str]
+    sidecar_drive_file_id: Mapped[str | None]
+    song_title: Mapped[str | None]
+    text_options_json: Mapped[list[Any]] = mapped_column(default=list)
+    next_text_index: Mapped[int] = mapped_column(default=0)
+    local_path: Mapped[str | None]
+    duration_s: Mapped[float | None]
+    has_audio: Mapped[bool | None]
+    status: Mapped[MicroSourceStatus] = mapped_column(
+        StrEnumType(MicroSourceStatus), default=MicroSourceStatus.NEW, index=True
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_used_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+
+class MicroRenderRow(Base):
+    """One micro-edited variant for one daily slot. Has no posts, metrics or scores."""
+
+    __tablename__ = "micro_renders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("micro_sources.id"), index=True)
+    scheduled_for: Mapped[datetime] = mapped_column(index=True)
+    edit_json: Mapped[dict[str, Any]]
+    text: Mapped[str]
+    caption: Mapped[str]
+    file_path: Mapped[str | None]
+    duration_s: Mapped[float | None]
+    status: Mapped[MicroRenderStatus] = mapped_column(
+        StrEnumType(MicroRenderStatus), default=MicroRenderStatus.RENDERING, index=True
+    )
+    notified_at: Mapped[datetime | None]
+    downloaded_at: Mapped[datetime | None]
+    download_count: Mapped[int] = mapped_column(default=0)
+    ffmpeg_argv_json: Mapped[list[Any]] = mapped_column(default=list)
+    error: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)

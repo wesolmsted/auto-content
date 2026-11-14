@@ -9,6 +9,7 @@ class MediaKind(StrEnum):
     SCRATCH = "scratch"
     SHOTS = "shots"
     RENDERS = "renders"
+    MICRO = "micro"
 
 
 class MediaStore(Protocol):
