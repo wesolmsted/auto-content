@@ -21,7 +21,7 @@ type: project
 - Song audio lives in `~/.config/auto-content/audio/`; the Google client JSON is outside the repo too.
 - Meta developer app: not started. (TikTok was dropped from scope on 2026-11-14, DESIGN D11; `.env` can lose its empty `TIKTOK_*` lines.)
 - Step-by-step setup guide (Claude doc): https://claude.ai/artifact/UhXZwgqQrk7g2Vr8RyEXLx
-- Local DB: renders 1–4 (mixed orientation, before task 12) and 5 (landscape only) are `ready`, all notified; none downloaded yet.
+- Local DB (2026-11-14): at migration 0002. Renders 1–5 and their recipe rows were deleted unreviewed, with render files removed and shot `use_count`/`last_used_at` reset. Kept: 3 footage files, 88 tagged shots, 1 song, snippets 1–6 (1–3 inactive). Pre-cleanup backup in `tmp/engine-before-cleanup-2026-11-14.sqlite3`.
 - To test notifications outside 16:00–19:00 ET, set `ACE_NOTIFY__QUIET_HOURS__START=00:00:00` and `ACE_NOTIFY__QUIET_HOURS__END=00:00:00`.
 
 ## Open items
@@ -32,7 +32,7 @@ type: project
 - The hand-off page is localhost-only until the owner sets up Tailscale (setup guide doc, step 6).
 
 ## Next tasks
-1. Owner reviews renders 1–5 and the hand-off flow; tune from that feedback.
+1. Render a fresh batch (`ace render batch`), owner reviews it through the hand-off flow; tune from that feedback.
 2. Shared-file follow-ups: add `tzdata`; add `engine/render/fonts/*` to package data; resolve `luts_dir`/`font_file` against the config dir; bump `measure.meta_graph_url` after checking the real account.
 3. Native-looking text (DESIGN §7.4).
 4. launchd schedule (DESIGN §3).
