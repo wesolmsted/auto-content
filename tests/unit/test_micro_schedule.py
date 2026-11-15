@@ -2,9 +2,10 @@ from datetime import UTC, datetime, time
 
 import pytest
 
-from engine.db.models import MicroSourceRow
+from engine.db.enums import MicroSetStatus, MicroSourceStatus
+from engine.db.models import MicroSetRow, MicroSourceRow
 from engine.micro.schedule import (
-    least_recently_used,
+    pick_set_and_video,
     slots_for_day,
     slots_to_fill,
     take_next_text,
@@ -107,56 +108,124 @@ def test_utc_timezone_slots_match_the_post_times() -> None:
     ]
 
 
-def source(source_id: int, last_used_at: datetime | None = None) -> MicroSourceRow:
-    return MicroSourceRow(
-        id=source_id,
-        drive_file_id=f"d{source_id}",
-        name=f"clip{source_id}_micro.mp4",
+def micro_set(
+    set_id: int,
+    last_used_at: datetime | None = None,
+    status: MicroSetStatus = MicroSetStatus.ACTIVE,
+) -> MicroSetRow:
+    return MicroSetRow(
+        id=set_id,
+        drive_folder_id=f"folder{set_id}",
+        name=f"song{set_id}_micro",
+        song_title=f"Song {set_id}",
         text_options_json=["one", "two", "three"],
         next_text_index=0,
+        status=status,
         last_used_at=last_used_at,
     )
 
 
-def test_no_sources_means_no_choice() -> None:
-    assert least_recently_used([]) is None
+def video(
+    video_id: int,
+    set_id: int,
+    last_used_at: datetime | None = None,
+    status: MicroSourceStatus = MicroSourceStatus.READY,
+) -> MicroSourceRow:
+    return MicroSourceRow(
+        id=video_id,
+        set_id=set_id,
+        drive_file_id=f"file{video_id}",
+        name=f"clip{video_id}.mp4",
+        status=status,
+        last_used_at=last_used_at,
+    )
 
 
-def test_never_used_source_comes_before_any_used_one() -> None:
-    used = source(1, last_used_at=utc(2026, 6, 1, 12))
-    unused = source(2)
-    assert least_recently_used([used, unused]) is unused
+def picked_ids(sets: list[MicroSetRow], videos: list[MicroSourceRow]) -> tuple[int, int] | None:
+    picked = pick_set_and_video(sets, videos)
+    return None if picked is None else (picked[0].id, picked[1].id)
 
 
-def test_least_recently_used_source_wins() -> None:
-    recent = source(1, last_used_at=utc(2026, 6, 9, 12))
-    older = source(2, last_used_at=utc(2026, 6, 8, 12))
-    newest = source(3, last_used_at=utc(2026, 6, 10, 12))
-    assert least_recently_used([recent, older, newest]) is older
+def test_no_sets_means_no_choice() -> None:
+    assert picked_ids([], []) is None
+
+
+def test_never_used_set_comes_before_any_used_one() -> None:
+    sets = [micro_set(1, last_used_at=utc(2026, 6, 1, 12)), micro_set(2)]
+    assert picked_ids(sets, [video(10, 1), video(20, 2)]) == (2, 20)
+
+
+def test_least_recently_used_set_wins() -> None:
+    sets = [
+        micro_set(1, last_used_at=utc(2026, 6, 9, 12)),
+        micro_set(2, last_used_at=utc(2026, 6, 8, 12)),
+        micro_set(3, last_used_at=utc(2026, 6, 10, 12)),
+    ]
+    videos = [video(10, 1), video(20, 2), video(30, 3)]
+    assert picked_ids(sets, videos) == (2, 20)
 
 
 @pytest.mark.parametrize("last_used_at", [None, utc(2026, 6, 9, 12)])
-def test_ties_go_to_the_lowest_id(last_used_at: datetime | None) -> None:
-    sources = [source(7, last_used_at), source(3, last_used_at), source(5, last_used_at)]
-    chosen = least_recently_used(sources)
-    assert chosen is not None
-    assert chosen.id == 3
+def test_set_ties_go_to_the_lowest_id(last_used_at: datetime | None) -> None:
+    sets = [micro_set(7, last_used_at), micro_set(3, last_used_at), micro_set(5, last_used_at)]
+    videos = [video(70, 7), video(30, 3), video(50, 5)]
+    assert picked_ids(sets, videos) == (3, 30)
 
 
-def test_take_next_text_returns_texts_in_order_and_cycles() -> None:
-    row = source(1)
+def test_within_the_set_the_least_recently_used_video_wins() -> None:
+    videos = [
+        video(10, 1, last_used_at=utc(2026, 6, 9, 12)),
+        video(11, 1, last_used_at=utc(2026, 6, 8, 12)),
+        video(12, 1, last_used_at=utc(2026, 6, 10, 12)),
+    ]
+    assert picked_ids([micro_set(1)], videos) == (1, 11)
+
+
+@pytest.mark.parametrize("last_used_at", [None, utc(2026, 6, 9, 12)])
+def test_video_ties_go_to_the_lowest_id(last_used_at: datetime | None) -> None:
+    videos = [video(14, 1, last_used_at), video(12, 1, last_used_at), video(13, 1)]
+    expected = 13 if last_used_at is not None else 12
+    assert picked_ids([micro_set(1)], videos) == (1, expected)
+
+
+def test_set_without_a_ready_video_is_skipped_for_the_next_one() -> None:
+    sets = [micro_set(1), micro_set(2, last_used_at=utc(2026, 6, 9, 12))]
+    videos = [
+        video(10, 1, status=MicroSourceStatus.NEW),
+        video(11, 1, status=MicroSourceStatus.FAILED),
+        video(12, 1, status=MicroSourceStatus.REMOVED),
+        video(13, 1, status=MicroSourceStatus.DUPLICATE),
+        video(20, 2),
+    ]
+    assert picked_ids(sets, videos) == (2, 20)
+
+
+@pytest.mark.parametrize("status", [MicroSetStatus.WAITING, MicroSetStatus.REMOVED])
+def test_only_active_sets_are_used(status: MicroSetStatus) -> None:
+    sets = [micro_set(1, status=status), micro_set(2, last_used_at=utc(2026, 6, 9, 12))]
+    assert picked_ids(sets, [video(10, 1), video(20, 2)]) == (2, 20)
+
+
+def test_no_active_set_with_a_ready_video_means_no_choice() -> None:
+    sets = [micro_set(1), micro_set(2, status=MicroSetStatus.REMOVED)]
+    videos = [video(10, 1, status=MicroSourceStatus.NEW), video(20, 2)]
+    assert picked_ids(sets, videos) is None
+
+
+def test_take_next_text_returns_the_sets_texts_in_order_and_cycles() -> None:
+    row = micro_set(1)
     assert [take_next_text(row) for _ in range(5)] == ["one", "two", "three", "one", "two"]
     assert row.next_text_index == 5
 
 
 def test_take_next_text_wraps_an_index_past_the_end() -> None:
-    row = source(1)
+    row = micro_set(1)
     row.next_text_index = 7
     assert take_next_text(row) == "two"
     assert row.next_text_index == 8
 
 
 def test_single_text_repeats() -> None:
-    row = source(1)
+    row = micro_set(1)
     row.text_options_json = ["only"]
     assert [take_next_text(row) for _ in range(3)] == ["only", "only", "only"]

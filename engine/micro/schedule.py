@@ -4,7 +4,10 @@ from collections.abc import Collection, Sequence
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from engine.db.models import MicroSourceRow
+from engine.db.enums import MicroSetStatus, MicroSourceStatus
+from engine.db.models import MicroSetRow, MicroSourceRow
+
+_NEVER = datetime.min.replace(tzinfo=UTC)
 
 
 def slots_for_day(now: datetime, post_times: Sequence[time], timezone: str) -> list[datetime]:
@@ -36,22 +39,33 @@ def slots_to_fill(
     ]
 
 
-def least_recently_used(sources: Sequence[MicroSourceRow]) -> MicroSourceRow | None:
-    """The source used longest ago: never used first, ties by lowest id."""
-    return min(
-        sources,
-        key=lambda source: (
-            source.last_used_at is not None,
-            source.last_used_at or datetime.min.replace(tzinfo=UTC),
-            source.id,
-        ),
-        default=None,
-    )
+def pick_set_and_video(
+    sets: Sequence[MicroSetRow], videos: Sequence[MicroSourceRow]
+) -> tuple[MicroSetRow, MicroSourceRow] | None:
+    """The `active` set used least recently that has a `ready` video, and its `ready` video
+    used least recently. Never used comes first; ties go to the lowest id."""
+    ready_by_set: dict[int, list[MicroSourceRow]] = {}
+    for video in videos:
+        if video.status is MicroSourceStatus.READY:
+            ready_by_set.setdefault(video.set_id, []).append(video)
+    candidates = [
+        micro_set
+        for micro_set in sets
+        if micro_set.status is MicroSetStatus.ACTIVE and micro_set.id in ready_by_set
+    ]
+    if not candidates:
+        return None
+    chosen_set = min(candidates, key=_rotation_key)
+    return chosen_set, min(ready_by_set[chosen_set.id], key=_rotation_key)
 
 
-def take_next_text(source: MicroSourceRow) -> str:
-    """The source's next on-screen text in file order, cycling; advances `next_text_index`."""
-    texts = source.text_options_json
-    text = str(texts[source.next_text_index % len(texts)])
-    source.next_text_index += 1
+def take_next_text(micro_set: MicroSetRow) -> str:
+    """The set's next on-screen text in file order, cycling; advances `next_text_index`."""
+    texts = micro_set.text_options_json
+    text = str(texts[micro_set.next_text_index % len(texts)])
+    micro_set.next_text_index += 1
     return text
+
+
+def _rotation_key(row: MicroSetRow | MicroSourceRow) -> tuple[bool, datetime, int]:
+    return (row.last_used_at is not None, row.last_used_at or _NEVER, row.id)
