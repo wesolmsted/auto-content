@@ -445,6 +445,8 @@ The folder stays in the inbox and is **live**: every run re-reads it, so videos 
 
 Commits happen after each state change, so no write transaction is open during a Drive call.
 
+As built: duplicates are checked only when a video is inserted, reappears or changes, so a duplicate stays `duplicate` if the original is later removed. A removed set keeps its videos' rows and local files, so restoring the folder downloads nothing again. An invalid `.txt` is re-read every run until it's fixed.
+
 **Edits** (pure: `sample_edit(rng, settings.micro, text) -> MicroEdit`). Every variant draws fresh values, each from a config range:
 - trim: 0.1–0.5 s off the start and off the end;
 - speed: 1–3% faster or slower, applied to video and audio together (the audio is resampled, so its pitch moves with it);

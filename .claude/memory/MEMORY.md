@@ -37,3 +37,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 16: micro foundation](task-16-micro-foundation.md): micro sets/sources/renders tables, [micro] config, list_files/list_folders, fake Drive helpers, contracts and stub owners for slices 17-20
 - [Task 17: micro edits](task-17-micro-edits.md): sample_edit, build_micro_args/render_micro/validate_micro, text after hflip, 48 kHz pitch-shifted audio, drawtext needs ffmpeg-full
 - [Task 20: micro hand-off](task-20-micro-handoff.md): /micro/{id} page, preview, download ready→downloaded, index lists due ready micro renders
+- [Task 18: micro ingest](task-18-micro-ingest.md): parse_sidecar, poll_micro_sets live folder sync, duplicate/removed rules, choices the spec left open
