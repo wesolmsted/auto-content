@@ -31,6 +31,19 @@ type: project
 - `one_long_shot` ignores `opening_shot`.
 - The hand-off page is localhost-only until the owner sets up Tailscale (setup guide doc, step 6).
 
+## Micro edits (built 2026-11-15, DESIGN §7.10, D12)
+- Slices 16–20 are merged. They haven't been run against real Drive yet.
+- Owner steps to try it:
+  1. `ace init` applies migration 0003.
+  2. Put a `<song>_micro` folder (videos plus one `.txt`) in the footage inbox.
+  3. Run `ace micro run`, then `ace micro list`.
+- `ace micro run` should go on the launchd schedule every 15 min. It exits 1 if ntfy isn't configured.
+- Open choices kept as built:
+  - a duplicate stays `duplicate` after its original is removed;
+  - a removed set's local videos are kept;
+  - a saved micro render leaves the hand-off list;
+  - micro text uses the default white-with-outline style.
+
 ## Next tasks
 1. Render a fresh batch (`ace render batch`), owner reviews it through the hand-off flow; tune from that feedback.
 2. Shared-file follow-ups: add `tzdata`; add `engine/render/fonts/*` to package data; resolve `luts_dir`/`font_file` against the config dir; bump `measure.meta_graph_url` after checking the real account.

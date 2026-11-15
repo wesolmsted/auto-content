@@ -38,3 +38,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 17: micro edits](task-17-micro-edits.md): sample_edit, build_micro_args/render_micro/validate_micro, text after hflip, 48 kHz pitch-shifted audio, drawtext needs ffmpeg-full
 - [Task 20: micro hand-off](task-20-micro-handoff.md): /micro/{id} page, preview, download ready→downloaded, index lists due ready micro renders
 - [Task 18: micro ingest](task-18-micro-ingest.md): parse_sidecar, poll_micro_sets live folder sync, duplicate/removed rules, choices the spec left open
+- [Task 19: micro schedule](task-19-micro-schedule.md): slots_to_fill, set-then-video LRU rotation, run_micro_renders, micro notify/expiry, ace micro commands, tests/fakes/micro.py
