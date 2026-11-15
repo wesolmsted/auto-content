@@ -10,8 +10,8 @@ from pydantic import SecretStr
 from sqlalchemy.orm import Session, sessionmaker
 
 from engine.config import load_settings
-from engine.db.enums import MicroRenderStatus, MicroSourceStatus
-from engine.db.models import MicroRenderRow, MicroSourceRow
+from engine.db.enums import MicroRenderStatus, MicroSetStatus, MicroSourceStatus
+from engine.db.models import MicroRenderRow, MicroSetRow, MicroSourceRow
 from engine.db.session import create_db_engine, make_session_factory, session_scope
 from engine.handoff.app import create_app
 from engine.storage.media_store import LocalMediaStore, MediaKind
@@ -54,11 +54,20 @@ class MicroHandoff:
         with_file: bool = True,
     ) -> int:
         with session_scope(self.sessions) as session:
-            source = MicroSourceRow(
-                drive_file_id=f"drive-{caption}-{scheduled_for.isoformat()}-{text}",
-                name="beach_hook_micro.mov",
+            drive_id = f"drive-{caption}-{scheduled_for.isoformat()}-{text}"
+            micro_set = MicroSetRow(
+                drive_folder_id=f"folder-{drive_id}",
+                name=f"{caption}_micro",
                 song_title=caption,
                 text_options_json=[text],
+                status=MicroSetStatus.ACTIVE,
+            )
+            session.add(micro_set)
+            session.flush()
+            source = MicroSourceRow(
+                set_id=micro_set.id,
+                drive_file_id=drive_id,
+                name="beach_hook.mov",
                 status=MicroSourceStatus.READY,
             )
             session.add(source)
