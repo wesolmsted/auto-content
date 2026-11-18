@@ -145,6 +145,8 @@ def _sync_sidecar(
         micro_set.error = f"{type(error).__name__}: {error}"
         return
     micro_set.song_title = sidecar.song_title
+    micro_set.caption = sidecar.caption
+    micro_set.text_cutoff_s = sidecar.text_cutoff_s
     micro_set.text_options_json = list(sidecar.text_options)
     micro_set.sidecar_drive_file_id = sidecar_file.id
     micro_set.sidecar_md5 = sidecar_file.md5

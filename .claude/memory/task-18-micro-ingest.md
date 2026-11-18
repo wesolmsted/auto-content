@@ -11,8 +11,8 @@ Slice 18 built `ace micro ingest`'s engine: sidecar parsing and the live-folder 
 ## Public API
 - `engine/micro/sidecar.py`: `parse_sidecar(text) -> Sidecar`, `SidecarError(ValueError)`.
   - Strips a BOM, splits on any newline and ignores blank lines.
-  - The first line must start with `song:` (any case). Other lines are text options, stripped.
-  - Messages: `sidecar is empty`, ``first non-empty line must be `song: <name>`, got '...'``, `song name is empty`, `sidecar has no text options after the song line`.
+  - The first line must start with `song:` (any case). Then optional `caption:` and `cutoff:` lines (added 2026-11-18, migration 0004, stored as `micro_sets.caption`/`text_cutoff_s`). Other lines are text options, stripped.
+  - Messages: `sidecar is empty`, ``first non-empty line must be `song: <name>`, got '...'``, `song name is empty`, `sidecar has no text options after the song line`. Caption/cutoff errors: `caption is empty`, `cutoff must be a time like 0:02.4 or 2.4, got '...'`, `cutoff must be after 0:00`, ``more than one `caption:` line``.
 - `engine/micro/ingest.py`: `poll_micro_sets(session, drive, store, drive_settings, micro_settings, *, ffprobe="ffprobe") -> MicroIngestSummary`.
   - Commits itself after every change. Moves nothing in Drive.
 

@@ -259,3 +259,29 @@ def test_trims_that_leave_nothing_are_rejected() -> None:
 
     with pytest.raises(ValueError, match="nothing left"):
         build_micro_args(edit, short, Path("/r.mp4"), SETTINGS)
+
+
+def test_text_cutoff_on_the_source_is_moved_by_the_trim_and_speed() -> None:
+    edit = make_edit(text_cutoff_s=2.4)
+
+    graph = build_micro_args(edit, SOURCE, Path("/r.mp4"), SETTINGS)[3]
+
+    # (2.4 - 0.2) / 1.02 = 2.156863 s into the render; both text lines stop together.
+    assert graph.count(":enable='lt(t,2.156863)'") == 2
+    assert graph.count("drawtext=") == 2
+
+
+def test_without_a_cutoff_the_text_stays_for_the_whole_render() -> None:
+    graph = build_micro_args(make_edit(), SOURCE, Path("/r.mp4"), SETTINGS)[3]
+
+    assert "enable=" not in graph
+    assert graph.count("drawtext=") == 2
+
+
+def test_a_cutoff_inside_the_trimmed_start_draws_no_text() -> None:
+    edit = make_edit(trim_start_s=0.4, text_cutoff_s=0.3)
+
+    graph = build_micro_args(edit, SOURCE, Path("/r.mp4"), SETTINGS)[3]
+
+    assert "drawtext=" not in graph
+    assert ",hue=h=-3.0,fps=30," in graph

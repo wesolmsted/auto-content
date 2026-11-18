@@ -127,6 +127,12 @@ def _audio_chain(edit: MicroEdit, trim_end_s: float) -> str:
 
 
 def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) -> list[str]:
+    enable: list[str] = []
+    if edit.text_cutoff_s is not None:
+        text_end_s = (edit.text_cutoff_s - edit.trim_start_s) / edit.speed
+        if text_end_s <= 0:
+            return []
+        enable = [f"enable='lt(t,{_number(text_end_s)})'"]
     style = TextRenderStyle.default(render)
     lines = textwrap.wrap(edit.text, width=text_max_chars) or [edit.text]
     font_size = round(edit.text_size_fraction * render.height)
@@ -150,6 +156,7 @@ def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) 
                 f"bordercolor={escape_filter_value(style.border_color)}",
                 "x=(w-text_w)/2",
                 f"y={first_y + index * line_step}",
+                *enable,
             ]
         )
         for index, line in enumerate(lines)

@@ -182,6 +182,35 @@ def test_mirrored_render_is_the_horizontal_flip_of_the_unmirrored_one(
 
 
 @needs_drawtext
+def test_text_disappears_at_the_cutoff(
+    tmp_path: Path, settings: Settings, portrait_scenes_clip: Path
+) -> None:
+    source = source_for(portrait_scenes_clip)
+    with_cutoff = make_edit(text_cutoff_s=2.4)
+    without_cutoff = make_edit()
+    render_micro(with_cutoff, source, tmp_path / "cut.mp4", settings)
+    render_micro(without_cutoff, source, tmp_path / "full.mp4", settings)
+
+    # The cutoff 2.4 s on the source is (2.4 - 0.3) / 1.03 = 2.04 s into the render.
+    before = 1.5
+    after = 2.6
+    assert (
+        mean_difference(
+            frame_at(tmp_path / "cut.mp4", before, settings),
+            frame_at(tmp_path / "full.mp4", before, settings),
+        )
+        < 0.5
+    )
+    assert (
+        mean_difference(
+            frame_at(tmp_path / "cut.mp4", after, settings),
+            frame_at(tmp_path / "full.mp4", after, settings),
+        )
+        > 1.0
+    )
+
+
+@needs_drawtext
 def test_a_render_that_misses_the_plan_raises_validation_error(
     tmp_path: Path, settings: Settings, portrait_scenes_clip: Path
 ) -> None:

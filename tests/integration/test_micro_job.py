@@ -89,6 +89,22 @@ def test_fills_each_of_todays_slots_with_a_ready_render(
     assert video.last_used_at == SLOTS[2]
 
 
+def test_the_sets_text_cutoff_goes_into_each_edit(db_session: Session, tmp_path: Path) -> None:
+    store = LocalMediaStore(tmp_path / "media")
+    micro_set = add_micro_set(db_session)
+    micro_set.caption = "for a future auto-upload"
+    micro_set.text_cutoff_s = 2.4
+    db_session.commit()
+    add_micro_video(db_session, micro_set)
+    renderer = FakeMicroRenderer()
+
+    run(db_session, store, MORNING, renderer)
+
+    assert [call[0].text_cutoff_s for call in renderer.calls] == [2.4, 2.4, 2.4]
+    assert [row.edit_json["text_cutoff_s"] for row in renders(db_session)] == [2.4, 2.4, 2.4]
+    assert {row.caption for row in renders(db_session)} == {"You Dont Dance"}
+
+
 def test_rerun_fills_nothing_more(db_session: Session, tmp_path: Path) -> None:
     store = LocalMediaStore(tmp_path / "media")
     add_micro_video(db_session, add_micro_set(db_session))

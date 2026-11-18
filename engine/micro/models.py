@@ -7,11 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Sidecar(BaseModel):
-    """A micro set's parsed `.txt`: the song name (the caption) and the on-screen texts."""
+    """A micro set's parsed `.txt`: the song name, the optional post caption (kept for future
+    auto-uploads), the optional time on the source video when the on-screen text disappears,
+    and the on-screen texts."""
 
     model_config = ConfigDict(frozen=True)
 
     song_title: str = Field(min_length=1)
+    caption: str | None = Field(default=None, min_length=1)
+    text_cutoff_s: float | None = Field(default=None, gt=0)
     text_options: tuple[str, ...] = Field(min_length=1)
 
 
@@ -26,7 +30,8 @@ class MicroEdit(BaseModel):
 
     `crop_x`/`crop_y` place the zoomed crop window inside the zoom margin: 0 is the left/top
     edge, 0.5 centered, 1 the right/bottom edge. `text_y_offset` shifts the text by that
-    fraction of the frame height (positive is down).
+    fraction of the frame height (positive is down). `text_cutoff_s` is the time on the
+    source video when the text disappears; None keeps it for the whole render.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -46,6 +51,7 @@ class MicroEdit(BaseModel):
     text_position: MicroTextPosition
     text_size_fraction: float = Field(gt=0)
     text_y_offset: float
+    text_cutoff_s: float | None = Field(default=None, gt=0)
 
 
 class MicroSourceMedia(BaseModel):
