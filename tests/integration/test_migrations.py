@@ -115,3 +115,39 @@ def test_upgrade_to_0002_removes_tiktok_data_and_the_export_table(tmp_path: Path
     assert metrics == [1]
     assert scores == ["ig_trial", "internal"]
     assert "metric_imports" not in tables
+
+
+def test_upgrade_to_0005_keeps_micro_sets_that_videos_point_to(tmp_path: Path) -> None:
+    url = f"sqlite:///{tmp_path / 'micro.sqlite3'}"
+    command.upgrade(alembic_config(url), "0004")
+    engine = create_db_engine(url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "insert into micro_sets (id, drive_folder_id, name, song_title, "
+                "text_options_json, next_text_index, status, created_at, updated_at, "
+                "text_cutoff_s) values (1, 'folder1', 'a_micro', 'A', '[\"hi\"]', 2, 'active', "
+                ":now, :now, 2.4)"
+            ),
+            {"now": NOW},
+        )
+        connection.execute(
+            text(
+                "insert into micro_sources (id, set_id, drive_file_id, name, status, attempts, "
+                "created_at, updated_at) values (1, 1, 'file1', 'clip.mp4', 'ready', 0, :now, :now)"
+            ),
+            {"now": NOW},
+        )
+    engine.dispose()
+
+    upgrade_to_head(url)
+
+    engine = create_db_engine(url)
+    with engine.connect() as connection:
+        sets = connection.execute(
+            text("select id, next_text_index, text_cutoff_s, mirror_allowed from micro_sets")
+        ).all()
+        sources = connection.execute(text("select id, set_id from micro_sources")).all()
+    engine.dispose()
+    assert sets == [(1, 2, 2.4, 1)]
+    assert sources == [(1, 1)]

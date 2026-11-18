@@ -16,13 +16,12 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+# Plain ALTER TABLE, not batch mode: see 0005.
 def upgrade() -> None:
-    with op.batch_alter_table("micro_sets") as batch_op:
-        batch_op.add_column(sa.Column("caption", sa.String(), nullable=True))
-        batch_op.add_column(sa.Column("text_cutoff_s", sa.Double(), nullable=True))
+    op.add_column("micro_sets", sa.Column("caption", sa.String(), nullable=True))
+    op.add_column("micro_sets", sa.Column("text_cutoff_s", sa.Double(), nullable=True))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("micro_sets") as batch_op:
-        batch_op.drop_column("text_cutoff_s")
-        batch_op.drop_column("caption")
+    op.drop_column("micro_sets", "text_cutoff_s")
+    op.drop_column("micro_sets", "caption")
