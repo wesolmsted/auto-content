@@ -39,3 +39,4 @@ Don't store anything already in the code, docs/DESIGN.md, README.md or git histo
 - [Task 20: micro hand-off](task-20-micro-handoff.md): /micro/{id} page, preview, download ready→downloaded, index lists due ready micro renders
 - [Task 18: micro ingest](task-18-micro-ingest.md): parse_sidecar, poll_micro_sets live folder sync, duplicate/removed rules, choices the spec left open
 - [Task 19: micro schedule](task-19-micro-schedule.md): slots_to_fill, set-then-video LRU rotation, run_micro_renders, micro notify/expiry, ace micro commands, tests/fakes/micro.py
+- [Google token expiry](google-token-expiry.md): Drive token fails with invalid_grant after 7 days while the OAuth app is in Testing; re-run ace auth google, publish the app
