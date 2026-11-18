@@ -25,6 +25,7 @@ type: project
 - To test notifications outside 16:00–19:00 ET, set `ACE_NOTIFY__QUIET_HOURS__START=00:00:00` and `ACE_NOTIFY__QUIET_HOURS__END=00:00:00`.
 
 ## Open items
+- Tests that call `load_settings(REPO_CONFIG_DIR)` also read the owner's git-ignored `config/local.toml`, so local overrides leak into them (found 2026-11-18 when `micro.font_file` changed a micro args test; that test now clears it). Fix: a test helper that loads `default.toml` only.
 - Q13 caption-match `min_score`: tune with real data.
 - A render whose notification keeps failing stays `ready` forever; expiry doesn't run when ntfy isn't configured (task-14 questions).
 - `render one` with `ignore_limits` could reuse a shot when n > 1 (only n = 1 uses it today).

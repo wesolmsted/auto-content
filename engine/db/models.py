@@ -237,6 +237,7 @@ class MicroSetRow(Base):
     song_title: Mapped[str | None]
     caption: Mapped[str | None]
     text_cutoff_s: Mapped[float | None]
+    mirror_allowed: Mapped[bool] = mapped_column(default=True)
     text_options_json: Mapped[list[Any]] = mapped_column(default=list)
     next_text_index: Mapped[int] = mapped_column(default=0)
     sidecar_drive_file_id: Mapped[str | None]

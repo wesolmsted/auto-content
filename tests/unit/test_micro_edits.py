@@ -12,8 +12,10 @@ from engine.micro.render import build_micro_args
 from engine.render.filters import escape_filter_value
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SETTINGS = load_settings(REPO_ROOT / "config", env_file=None)
-MICRO = SETTINGS.micro
+LOADED = load_settings(REPO_ROOT / "config", env_file=None)
+# The repo default font, whatever micro.font_file the owner's local.toml sets.
+MICRO = LOADED.micro.model_copy(update={"font_file": None})
+SETTINGS = LOADED.model_copy(update={"micro": MICRO})
 TEXT = "POV: you finally hit the drop"
 EPSILON = 1e-9
 

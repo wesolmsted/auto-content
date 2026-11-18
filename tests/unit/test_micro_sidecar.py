@@ -121,3 +121,36 @@ def test_invalid_caption_and_cutoff_lines_raise_with_a_clear_message(
         parse_sidecar(text)
 
     assert str(raised.value) == message
+
+
+def test_mirror_is_allowed_unless_a_mirror_line_turns_it_off() -> None:
+    assert parse_sidecar("song: A\nhello").mirror_allowed is True
+    assert parse_sidecar("song: A\nmirror: off\nhello") == Sidecar(
+        song_title="A", mirror_allowed=False, text_options=("hello",)
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "allowed"),
+    [("off", False), ("No", False), ("FALSE", False), ("on", True), ("yes", True), ("true", True)],
+)
+def test_mirror_line_accepts_on_and_off_words(value: str, allowed: bool) -> None:
+    sidecar = parse_sidecar(f"song: A\ncaption: c\nmirror: {value}\ncutoff: 2\nhello")
+
+    assert sidecar.mirror_allowed is allowed
+    assert sidecar.caption == "c"
+    assert sidecar.text_cutoff_s == 2.0
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("song: A\nmirror: sometimes\nhello", "mirror must be on or off, got 'sometimes'"),
+        ("song: A\nmirror: off\nmirror: on\nhello", "more than one `mirror:` line"),
+    ],
+)
+def test_invalid_mirror_lines_raise_with_a_clear_message(text: str, message: str) -> None:
+    with pytest.raises(SidecarError) as raised:
+        parse_sidecar(text)
+
+    assert str(raised.value) == message

@@ -112,8 +112,12 @@ def _create_render(
     text = take_next_text(micro_set)
     micro_set.last_used_at = slot
     video.last_used_at = slot
-    edit = edit_sampler(rng, settings.micro, text).model_copy(
-        update={"text_cutoff_s": micro_set.text_cutoff_s}
+    edit = edit_sampler(rng, settings.micro, text)
+    edit = edit.model_copy(
+        update={
+            "text_cutoff_s": micro_set.text_cutoff_s,
+            "mirror": edit.mirror and micro_set.mirror_allowed,
+        }
     )
     row = MicroRenderRow(
         source_id=video.id,

@@ -5,8 +5,11 @@ from engine.micro.models import Sidecar
 SONG_PREFIX = "song:"
 CAPTION_KEY = "caption"
 CUTOFF_KEY = "cutoff"
+MIRROR_KEY = "mirror"
+MIRROR_ON = {"on", "yes", "true"}
+MIRROR_OFF = {"off", "no", "false"}
 BYTE_ORDER_MARK = "﻿"
-HEADER_LINE = re.compile(rf"^({CAPTION_KEY}|{CUTOFF_KEY}):(.*)$", re.IGNORECASE)
+HEADER_LINE = re.compile(rf"^({CAPTION_KEY}|{CUTOFF_KEY}|{MIRROR_KEY}):(.*)$", re.IGNORECASE)
 CUTOFF_TIME = re.compile(r"^(?:(\d+):)?(\d+(?:\.\d+)?)s?$")
 
 
@@ -16,8 +19,8 @@ class SidecarError(ValueError):
 
 def parse_sidecar(text: str) -> Sidecar:
     """Parse a micro set's `.txt`: first non-empty line `song: <name>`, then optional
-    `caption: <text>` and `cutoff: <time>` lines in either order, then one text option per
-    non-empty line. Raises SidecarError."""
+    `caption: <text>`, `cutoff: <time>` and `mirror: on|off` lines in any order, then one text
+    option per non-empty line. Raises SidecarError."""
     lines = [line.strip() for line in text.removeprefix(BYTE_ORDER_MARK).splitlines()]
     non_empty = [line for line in lines if line]
     if not non_empty:
@@ -42,12 +45,15 @@ def parse_sidecar(text: str) -> Sidecar:
         raise SidecarError("caption is empty")
     cutoff = headers.get(CUTOFF_KEY)
     text_cutoff_s = None if cutoff is None else _parse_cutoff(cutoff)
+    mirror = headers.get(MIRROR_KEY)
+    mirror_allowed = True if mirror is None else _parse_mirror(mirror)
     if not rest:
         raise SidecarError("sidecar has no text options after the song line")
     return Sidecar(
         song_title=song_title,
         caption=caption,
         text_cutoff_s=text_cutoff_s,
+        mirror_allowed=mirror_allowed,
         text_options=tuple(rest),
     )
 
@@ -63,3 +69,11 @@ def _parse_cutoff(value: str) -> float:
     if total <= 0:
         raise SidecarError("cutoff must be after 0:00")
     return total
+
+
+def _parse_mirror(value: str) -> bool:
+    if value.lower() in MIRROR_ON:
+        return True
+    if value.lower() in MIRROR_OFF:
+        return False
+    raise SidecarError(f"mirror must be on or off, got {value!r}")

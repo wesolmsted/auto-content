@@ -5,11 +5,11 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from engine.config import Settings, load_settings
+from engine.config import MicroSettings, Settings, load_settings
 from engine.db.enums import MicroRenderStatus, MicroSetStatus, MicroSourceStatus
 from engine.db.models import MicroRenderRow
 from engine.micro.job import MicroRenderSummary, run_micro_renders
-from engine.micro.models import MicroSourceMedia
+from engine.micro.models import MicroEdit, MicroSourceMedia
 from engine.storage.media_store import LocalMediaStore, MediaKind
 from tests.fakes.micro import (
     FakeMicroRenderer,
@@ -45,6 +45,10 @@ def run(
         edit_sampler=fixed_edit,
         duration_of=fixed_duration_s,
     )
+
+
+def mirrored_edit(rng: random.Random, settings: MicroSettings, text: str) -> MicroEdit:
+    return fixed_edit(rng, settings, text).model_copy(update={"mirror": True})
 
 
 def renders(session: Session) -> list[MicroRenderRow]:
@@ -103,6 +107,31 @@ def test_the_sets_text_cutoff_goes_into_each_edit(db_session: Session, tmp_path:
     assert [call[0].text_cutoff_s for call in renderer.calls] == [2.4, 2.4, 2.4]
     assert [row.edit_json["text_cutoff_s"] for row in renders(db_session)] == [2.4, 2.4, 2.4]
     assert {row.caption for row in renders(db_session)} == {"You Dont Dance"}
+
+
+def test_a_set_with_mirroring_off_never_mirrors(db_session: Session, tmp_path: Path) -> None:
+    store = LocalMediaStore(tmp_path / "media")
+    lyrics = add_micro_set(db_session, song_title="Lyrics")
+    lyrics.mirror_allowed = False
+    db_session.commit()
+    add_micro_video(db_session, lyrics)
+    plain = add_micro_set(db_session, song_title="Plain")
+    add_micro_video(db_session, plain)
+    renderer = FakeMicroRenderer()
+
+    run_micro_renders(
+        db_session,
+        store,
+        SETTINGS,
+        MORNING,
+        random.Random(1),
+        renderer=renderer,
+        edit_sampler=mirrored_edit,
+        duration_of=fixed_duration_s,
+    )
+
+    mirror_by_caption = [(row.caption, row.edit_json["mirror"]) for row in renders(db_session)]
+    assert mirror_by_caption == [("Lyrics", False), ("Plain", True), ("Lyrics", False)]
 
 
 def test_rerun_fills_nothing_more(db_session: Session, tmp_path: Path) -> None:

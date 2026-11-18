@@ -1,6 +1,7 @@
 song: you don't dance
 caption: you don't dance
 cutoff: 0:02.4
+mirror: off
 2009 type edm >
 2014 type edm >
 hyperpop + recession pop

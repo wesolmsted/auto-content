@@ -206,6 +206,7 @@ style_references
 
 micro_sets                                              -- §7.10: one `<song>_micro` Drive folder
   id PK, drive_folder_id UNIQUE, name, song_title NULL, caption NULL, text_cutoff_s NULL,
+  mirror_allowed BOOL DEFAULT TRUE,
   text_options_json,
   next_text_index INT DEFAULT 0, sidecar_drive_file_id NULL, sidecar_md5 NULL,
   status [waiting|active|removed], error, last_used_at NULL, created_at, updated_at
@@ -430,14 +431,16 @@ Sometimes the owner has reels that are already edited the way they want them. Th
 song: You Dont Dance
 caption: you don't dance
 cutoff: 0:02.4
+mirror: off
 POV: you finally hit the drop
 wait for it
 ```
 
 - The first non-empty line must be `song: <name>`. The song name is what the hand-off page and the notification show as the caption. The folder name is only a label.
-- Then two optional lines, in either order, each at most once (key names in any case):
+- Then optional lines, in any order, each at most once (key names in any case):
   - `caption: <text>`: the post caption, stored on the set (`micro_sets.caption`) for future auto-uploads. It isn't shown or used anywhere yet.
   - `cutoff: <time>`: when the on-screen text disappears, as a time on the *source* video. It takes `m:ss.s` (`0:02.4`) or plain seconds (`2.4` or `2.4s`) and must be after 0:00. Without it, the text stays for the whole render.
+  - `mirror: off` (or `no`/`false`): never mirror this set's videos, e.g. when they show lyrics or other text. `on`/`yes`/`true`, or no line, keeps the random mirror.
 - Every other non-empty line is one on-screen text option (at least one), shared by all the set's videos. A `caption:` or `cutoff:` line after the first text option is just a text option.
 - The videos have no text burned in. Each video's own audio track is used.
 
@@ -457,7 +460,7 @@ As built: duplicates are checked only when a video is inserted, reappears or cha
 - trim: 0.1–0.5 s off the start and off the end;
 - speed: 1–3% faster or slower, applied to video and audio together (the audio is resampled, so its pitch moves with it);
 - zoom: 2–5%, cropped inside the source's own frame, with the crop window shifted randomly inside the zoom margin;
-- mirror: horizontal flip with probability `micro.mirror_probability` (0.5);
+- mirror: horizontal flip with probability `micro.mirror_probability` (0.5), unless the set has `mirror: off` (the job then forces `mirror` false in the edit);
 - color: brightness ±0.03, contrast 0.95–1.08, saturation 0.9–1.15, hue ±4°;
 - text: the source's next text option in file order, cycling forever. It's placed at the top or center, with its size within ±10% of the base and a small vertical jitter, and wrapped onto lines of at most `micro.text_max_chars` characters. With a set cutoff, the job copies it into the edit (`MicroEdit.text_cutoff_s`), and the text stops at `(cutoff − trim_start) / speed` into the render, so it disappears at the same moment of the content. A cutoff inside the trimmed start draws no text.
 
@@ -605,6 +608,7 @@ Phases 2–4 follow the README roadmap; each gets broken into slices here before
 | 2026-11-14 | D11 | Instagram Trial Reels only; TikTok removed | Owner decision to cut scope. Removed: the TikTok reader and `ace auth tiktok`, TikTok link parsing, the TikTok cadence and caption config, the TikTok Studio export import (`ace ingest exports`, `metric_imports`, the `export` metric checkpoint/source). Migration 0002 drops `metric_imports` and deletes TikTok rows. The multi-platform plumbing stays so a platform can be added back. |
 | 2026-11-14 | D12 | Micro edits from `<song>_micro` folders, separate from recipe renders | Owner request: post finished reels 3× a day as Trial Reels without duplicate flags. The owner chose: no burned-in text in the uploads; a folder of several videos plus one `.txt` with `song:` and the text options; the folder stays live in the inbox; all edit types (mirror and audio speed shift included); unlimited reuse, sets and videos least recently used first, texts cycling per set; three slots spread across the day; no tracking or learning. A first draft used single `*_micro` files with a same-name sidecar; migration 0003 was reworked before any database applied it. |
 | 2026-11-18 | — | Micro `.txt` gains optional `caption:` and `cutoff:` lines; the cutoff is a time on the source video | Owner request: a caption stored for future auto-uploads, and on-screen text that disappears at a set moment. Measuring the cutoff on the source keeps it on the same moment of the content despite each render's trim and speed change. The hand-off page still copies the song name (migration 0004). |
+| 2026-11-18 | — | Micro `.txt` gains an optional `mirror:` line | Owner request: some reels have lyrics, which read backwards when mirrored (migration 0005). |
 | 2026-11-18 | — | Micro renders keep the source's aspect ratio (black bars) and use Helvetica Bold | Owner request after the first micro run: cropping square reels to 9:16 cut off content. |
 
 ---

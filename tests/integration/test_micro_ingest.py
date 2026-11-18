@@ -247,19 +247,24 @@ def test_an_edited_txt_updates_the_texts_and_keeps_the_text_index(
 def test_caption_and_cutoff_are_stored_and_cleared_when_the_txt_drops_them(
     poll: Poller, drive: FakeDriveClient
 ) -> None:
-    add_set(drive, sidecar=b"song: you don't dance\ncaption: new drop\ncutoff: 0:02.4\nhi\n")
+    add_set(
+        drive,
+        sidecar=b"song: you don't dance\ncaption: new drop\ncutoff: 0:02.4\nmirror: off\nhi\n",
+    )
 
     poll()
     micro_set = poll.sets()["set1"]
     assert micro_set.status == MicroSetStatus.ACTIVE
     assert micro_set.caption == "new drop"
     assert micro_set.text_cutoff_s == 2.4
+    assert micro_set.mirror_allowed is False
     assert micro_set.text_options_json == ["hi"]
 
     drive.replace_content("set1_txt", SIDECAR)
 
     poll()
     micro_set = poll.sets()["set1"]
+    assert micro_set.mirror_allowed is True
     assert micro_set.caption is None
     assert micro_set.text_cutoff_s is None
     assert micro_set.text_options_json == SIDECAR_TEXTS

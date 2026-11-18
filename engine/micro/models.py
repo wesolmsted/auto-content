@@ -16,6 +16,7 @@ class Sidecar(BaseModel):
     song_title: str = Field(min_length=1)
     caption: str | None = Field(default=None, min_length=1)
     text_cutoff_s: float | None = Field(default=None, gt=0)
+    mirror_allowed: bool = True
     text_options: tuple[str, ...] = Field(min_length=1)
 
 
