@@ -9,6 +9,7 @@ from engine.config import MicroSettings, load_settings
 from engine.micro.edits import output_duration_s, sample_edit
 from engine.micro.models import MicroEdit, MicroSourceMedia, MicroTextPosition
 from engine.micro.render import build_micro_args
+from engine.render.filters import escape_filter_value
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SETTINGS = load_settings(REPO_ROOT / "config", env_file=None)
@@ -175,9 +176,10 @@ def test_args_apply_every_edit_in_one_graph_with_pitch_shifted_audio() -> None:
 
     video = (
         "[0:v]trim=start=0.2:end=9.7,setpts=(PTS-STARTPTS)/1.02,"
-        "scale=1124:1996:force_original_aspect_ratio=increase,"
-        "crop=w=1080:h=1920:x=(iw-ow)*0.25:y=(ih-oh)*0.75,setsar=1,hflip,"
-        "eq=brightness=0.02:contrast=1.05:saturation=1.1,hue=h=-3.0,"
+        "crop=w=iw/1.04:h=ih/1.04:x=(iw-ow)*0.25:y=(ih-oh)*0.75,"
+        "scale=1080:1920:force_original_aspect_ratio=decrease:force_divisible_by=2,"
+        "setsar=1,hflip,eq=brightness=0.02:contrast=1.05:saturation=1.1,hue=h=-3.0,"
+        "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,"
         f"drawtext={FONT}:text='POV\\: you finally':{TEXT_STYLE}:x=(w-text_w)/2:y=307,"
         f"drawtext={FONT}:text='hit the drop':{TEXT_STYLE}:x=(w-text_w)/2:y=422,"
         "fps=30,format=yuv420p[video]"
@@ -284,4 +286,17 @@ def test_a_cutoff_inside_the_trimmed_start_draws_no_text() -> None:
     graph = build_micro_args(edit, SOURCE, Path("/r.mp4"), SETTINGS)[3]
 
     assert "drawtext=" not in graph
-    assert ",hue=h=-3.0,fps=30," in graph
+    assert ",pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,fps=30," in graph
+
+
+def test_micro_font_file_replaces_the_render_font_and_expands_home() -> None:
+    micro = MicroSettings.model_validate(
+        MICRO.model_dump() | {"font_file": "~/fonts/Helvetica-Bold.ttf"}
+    )
+    settings = SETTINGS.model_copy(update={"micro": micro})
+
+    graph = build_micro_args(make_edit(), SOURCE, Path("/r.mp4"), settings)[3]
+
+    font = escape_filter_value(str(Path.home() / "fonts" / "Helvetica-Bold.ttf"))
+    assert graph.count(f"drawtext=fontfile={font}:") == 2
+    assert "Anton" not in graph

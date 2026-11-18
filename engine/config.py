@@ -204,6 +204,7 @@ class MicroSettings(Section):
     text_size_jitter: float = Field(ge=0, lt=1)
     text_y_jitter: float = Field(ge=0)
     text_max_chars: int = Field(gt=0)
+    font_file: Path | None = None
 
     @field_validator("trim_s", "speed_change", "zoom", "contrast", "saturation")
     @classmethod
@@ -212,6 +213,11 @@ class MicroSettings(Section):
         if low > high:
             raise ValueError(f"range must run low to high, got [{low}, {high}]")
         return bounds
+
+    @field_validator("font_file")
+    @classmethod
+    def _expand_home(cls, path: Path | None) -> Path | None:
+        return path.expanduser() if path is not None else None
 
     @field_validator("post_times")
     @classmethod

@@ -3,7 +3,7 @@
 import textwrap
 from pathlib import Path
 
-from engine.config import RenderSettings, Settings
+from engine.config import MicroSettings, RenderSettings, Settings
 from engine.ffmpeg import probe, run_ffmpeg
 from engine.micro.edits import output_duration_s
 from engine.micro.models import MicroEdit, MicroSourceMedia, MicroTextPosition
@@ -33,7 +33,7 @@ def build_micro_args(
         )
     render = settings.render
     trim_end_s = source.duration_s - edit.trim_end_s
-    chains = [_video_chain(edit, trim_end_s, render, settings.micro.text_max_chars)]
+    chains = [_video_chain(edit, trim_end_s, render, settings.micro)]
     maps = ["-map", f"[{VIDEO_OUTPUT_LABEL}]"]
     audio_codec: list[str] = []
     if source.has_audio:
@@ -90,15 +90,18 @@ def validate_micro(
 
 
 def _video_chain(
-    edit: MicroEdit, trim_end_s: float, render: RenderSettings, text_max_chars: int
+    edit: MicroEdit, trim_end_s: float, render: RenderSettings, micro: MicroSettings
 ) -> str:
+    """The zoom crops inside the source's own frame, then the result is fitted into the 9:16
+    frame and padded with black, so the source keeps its aspect ratio."""
+    zoom = _number(edit.zoom)
     filters = [
         f"trim=start={_number(edit.trim_start_s)}:end={_number(trim_end_s)}",
         f"setpts=(PTS-STARTPTS)/{_number(edit.speed)}",
-        f"scale={_even(render.width * edit.zoom)}:{_even(render.height * edit.zoom)}"
-        ":force_original_aspect_ratio=increase",
-        f"crop=w={render.width}:h={render.height}"
+        f"crop=w=iw/{zoom}:h=ih/{zoom}"
         f":x=(iw-ow)*{_number(edit.crop_x)}:y=(ih-oh)*{_number(edit.crop_y)}",
+        f"scale={render.width}:{render.height}"
+        ":force_original_aspect_ratio=decrease:force_divisible_by=2",
         "setsar=1",
     ]
     if edit.mirror:
@@ -107,7 +110,8 @@ def _video_chain(
         f"eq=brightness={_number(edit.brightness)}:contrast={_number(edit.contrast)}"
         f":saturation={_number(edit.saturation)}",
         f"hue=h={_number(edit.hue_degrees)}",
-        *_text_filters(edit, render, text_max_chars),
+        f"pad={render.width}:{render.height}:(ow-iw)/2:(oh-ih)/2:black",
+        *_text_filters(edit, render, micro),
         f"fps={render.fps}",
         "format=yuv420p",
     ]
@@ -126,7 +130,7 @@ def _audio_chain(edit: MicroEdit, trim_end_s: float) -> str:
     return "[0:a]" + ",".join(filters) + f"[{AUDIO_OUTPUT_LABEL}]"
 
 
-def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) -> list[str]:
+def _text_filters(edit: MicroEdit, render: RenderSettings, micro: MicroSettings) -> list[str]:
     enable: list[str] = []
     if edit.text_cutoff_s is not None:
         text_end_s = (edit.text_cutoff_s - edit.trim_start_s) / edit.speed
@@ -134,7 +138,8 @@ def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) 
             return []
         enable = [f"enable='lt(t,{_number(text_end_s)})'"]
     style = TextRenderStyle.default(render)
-    lines = textwrap.wrap(edit.text, width=text_max_chars) or [edit.text]
+    font_file = micro.font_file or style.font_file
+    lines = textwrap.wrap(edit.text, width=micro.text_max_chars) or [edit.text]
     font_size = round(edit.text_size_fraction * render.height)
     line_step = round(font_size * LINE_SPACING)
     block_height = (len(lines) - 1) * line_step + font_size
@@ -147,7 +152,7 @@ def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) 
         "drawtext="
         + ":".join(
             [
-                f"fontfile={escape_filter_value(str(style.font_file))}",
+                f"fontfile={escape_filter_value(str(font_file))}",
                 f"text={escape_filter_value(line)}",
                 "expansion=none",
                 f"fontsize={font_size}",
@@ -161,10 +166,6 @@ def _text_filters(edit: MicroEdit, render: RenderSettings, text_max_chars: int) 
         )
         for index, line in enumerate(lines)
     ]
-
-
-def _even(value: float) -> int:
-    return 2 * round(value / 2)
 
 
 def _number(value: float) -> str:

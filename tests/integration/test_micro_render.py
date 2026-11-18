@@ -182,6 +182,27 @@ def test_mirrored_render_is_the_horizontal_flip_of_the_unmirrored_one(
 
 
 @needs_drawtext
+def test_a_landscape_source_keeps_its_aspect_ratio_with_black_bars_above_and_below(
+    tmp_path: Path, settings: Settings, landscape_motion_clip: Path
+) -> None:
+    source = source_for(landscape_motion_clip)
+    edit = make_edit(zoom=1.0, brightness=0.03, text_position=MicroTextPosition.CENTER)
+    out = tmp_path / "micro_bars.mp4"
+
+    render_micro(edit, source, out, settings)
+
+    frame = frame_at(out, 1.0, settings).astype(np.int16)
+    info = probe(landscape_motion_clip)
+    content_height = round(1080 * info.height / info.width)
+    bar = (1920 - content_height) // 2
+    assert frame[: bar - 4].max() < 24
+    assert frame[1920 - bar + 4 :].max() < 24
+    assert frame[bar + 4 : 1920 - bar - 4].mean() > 24
+    assert frame[bar + 4 : 1920 - bar - 4, :40].mean() > 10
+    assert frame[bar + 4 : 1920 - bar - 4, -40:].mean() > 10
+
+
+@needs_drawtext
 def test_text_disappears_at_the_cutoff(
     tmp_path: Path, settings: Settings, portrait_scenes_clip: Path
 ) -> None:

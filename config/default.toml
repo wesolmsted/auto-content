@@ -215,3 +215,4 @@ text_size_fraction = 0.05     # of frame height
 text_size_jitter = 0.1        # +/- fraction of text_size_fraction
 text_y_jitter = 0.02          # +/- fraction of frame height
 text_max_chars = 18           # per line; longer text wraps
+# font_file = "~/.config/auto-content/fonts/Helvetica-Bold.ttf"  # unset: render.font_file
